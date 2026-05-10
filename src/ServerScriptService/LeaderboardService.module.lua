@@ -4,9 +4,9 @@ local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local DataService = require(script.Parent.DataService)
-local FormatNumber = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("FormatNumber"))
-
-local BOARD_BACKGROUND_IMAGE_ID = "rbxassetid://0"
+local shared = ReplicatedStorage:WaitForChild("Shared")
+local FormatNumber = require(shared:WaitForChild("FormatNumber"))
+local UIAssetConfig = require(shared:WaitForChild("UIAssetConfig"))
 local BOARD_UPDATE_SECONDS = 2.5
 
 local function hasCustomAssetId(assetId)
@@ -201,13 +201,14 @@ local function setupBoard()
 
 	rowLabels = {}
 
-	if hasCustomAssetId(BOARD_BACKGROUND_IMAGE_ID) then
+	local leaderboardConfig = UIAssetConfig.Leaderboard or {}
+	if hasCustomAssetId(leaderboardConfig.BackgroundImage) then
 		local backgroundImage = Instance.new("ImageLabel")
 		backgroundImage.Name = "BackgroundImage"
 		backgroundImage.Size = UDim2.fromScale(1, 1)
 		backgroundImage.Position = UDim2.fromScale(0, 0)
 		backgroundImage.BackgroundTransparency = 1
-		backgroundImage.Image = BOARD_BACKGROUND_IMAGE_ID
+		backgroundImage.Image = leaderboardConfig.BackgroundImage
 		backgroundImage.ImageTransparency = 0.42
 		backgroundImage.ScaleType = Enum.ScaleType.Stretch
 		backgroundImage.ZIndex = 0

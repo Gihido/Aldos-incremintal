@@ -4,34 +4,22 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
-local FormatNumber = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("FormatNumber"))
+local shared = ReplicatedStorage:WaitForChild("Shared")
+local FormatNumber = require(shared:WaitForChild("FormatNumber"))
+local UIAssetConfig = require(shared:WaitForChild("UIAssetConfig"))
 
-local COIN_POPUP_ICON_ID = "rbxassetid://0"
-local COIN_POPUP_BACKGROUND_IMAGE_ID = "rbxassetid://0"
-local UPGRADE_CARD_BACKGROUND_IMAGE_ID = "rbxassetid://0"
-local UPGRADE_BONUS_BADGE_BACKGROUND_IMAGE_ID = "rbxassetid://0"
-local UPGRADE_TOOLTIP_BACKGROUND_IMAGE_ID = "rbxassetid://0"
-local UPGRADE_ICONS = {
-	CoinGain = "rbxassetid://0",
-	MultiCoins = "rbxassetid://0",
-	MaxSpawnCoins = "rbxassetid://0",
-}
 local NOTIFICATION_CONFIG = {
 	Success = {
 		Color = Color3.fromRGB(90, 255, 130),
-		Icon = "rbxassetid://0",
 	},
 	Limit = {
 		Color = Color3.fromRGB(255, 200, 80),
-		Icon = "rbxassetid://0",
 	},
 	NotEnough = {
 		Color = Color3.fromRGB(255, 120, 70),
-		Icon = "rbxassetid://0",
 	},
 	Error = {
 		Color = Color3.fromRGB(255, 70, 70),
-		Icon = "rbxassetid://0",
 	},
 }
 
@@ -53,6 +41,7 @@ local animatedCoins = {}
 local latestPlayerData
 local upgradeCards = {}
 local notificationCount = 0
+local pendingPurchaseEffectUpgradeId
 
 local function getPlayerGui()
 	return player:WaitForChild("PlayerGui")
@@ -94,6 +83,14 @@ end
 
 local function hasCustomAssetId(assetId)
 	return type(assetId) == "string" and assetId ~= "" and assetId ~= "rbxassetid://0"
+end
+
+local function getUpgradeAssetConfig(upgradeId)
+	return (UIAssetConfig.UpgradeCards and UIAssetConfig.UpgradeCards[upgradeId]) or {}
+end
+
+local function getNotificationAssetConfig(notificationType)
+	return (UIAssetConfig.Notifications and UIAssetConfig.Notifications[notificationType]) or {}
 end
 
 local function addGradient(parent, colorA, colorB, rotation)
@@ -212,11 +209,13 @@ local function showCoinPickupPopup(amount)
 	local backgroundImage
 	local darkOverlay
 
-	if hasCustomAssetId(COIN_POPUP_BACKGROUND_IMAGE_ID) then
+	local coinPopupConfig = UIAssetConfig.CoinPickupPopup or {}
+
+	if hasCustomAssetId(coinPopupConfig.BackgroundImage) then
 		backgroundImage = Instance.new("ImageLabel")
 		backgroundImage.Name = "PopupBackgroundImage"
 		backgroundImage.BackgroundTransparency = 1
-		backgroundImage.Image = COIN_POPUP_BACKGROUND_IMAGE_ID
+		backgroundImage.Image = coinPopupConfig.BackgroundImage
 		backgroundImage.ImageTransparency = 0.2
 		backgroundImage.Position = UDim2.fromScale(0, 0)
 		backgroundImage.ScaleType = Enum.ScaleType.Stretch
@@ -237,7 +236,7 @@ local function showCoinPickupPopup(amount)
 	local icon = Instance.new("ImageLabel")
 	icon.Name = "Icon"
 	icon.BackgroundTransparency = 1
-	icon.Image = COIN_POPUP_ICON_ID
+	icon.Image = coinPopupConfig.IconImage or "rbxassetid://0"
 	icon.Position = UDim2.fromOffset(10, 9)
 	icon.ScaleType = Enum.ScaleType.Fit
 	icon.Size = UDim2.fromOffset(28, 28)
@@ -295,8 +294,11 @@ local function showCoinPickupPopup(amount)
 	iconTween:Play()
 end
 
+local addImageBackground
+
 local function showNotification(notificationType, message)
 	local config = NOTIFICATION_CONFIG[notificationType] or NOTIFICATION_CONFIG.Error
+	local assetConfig = getNotificationAssetConfig(notificationType)
 	local screenGui = getOrCreateScreenGui()
 	notificationCount += 1
 	local offsetY = ((notificationCount - 1) % 3) * 4
@@ -307,7 +309,7 @@ local function showNotification(notificationType, message)
 	frame.BackgroundColor3 = config.Color
 	frame.BackgroundTransparency = 0.16
 	frame.BorderSizePixel = 0
-	frame.Position = UDim2.new(1.28, 0, 0.35, offsetY)
+	frame.Position = UDim2.fromScale(1.28, 0.34)
 	frame.Size = UDim2.fromOffset(310, 60)
 	frame.ZIndex = 100 + notificationCount
 	frame.Parent = screenGui
@@ -315,6 +317,7 @@ local function showNotification(notificationType, message)
 	addCorner(frame, UDim.new(0, 14))
 	addStroke(frame, Color3.fromRGB(255, 255, 255), 2, 0.18)
 	addGradient(frame, config.Color, Color3.fromRGB(58, 60, 62), 0)
+	addImageBackground(frame, assetConfig.BackgroundImage, 0.12, 0.82)
 
 	local iconBackground = Instance.new("Frame")
 	iconBackground.Name = "IconBackground"
@@ -330,7 +333,7 @@ local function showNotification(notificationType, message)
 	local icon = Instance.new("ImageLabel")
 	icon.Name = "Icon"
 	icon.BackgroundTransparency = 1
-	icon.Image = config.Icon
+	icon.Image = assetConfig.IconImage or "rbxassetid://0"
 	icon.Position = UDim2.fromOffset(6, 6)
 	icon.ScaleType = Enum.ScaleType.Fit
 	icon.Size = UDim2.fromOffset(26, 26)
@@ -352,7 +355,7 @@ local function showNotification(notificationType, message)
 	label.ZIndex = frame.ZIndex + 2
 	label.Parent = frame
 
-	local targetPosition = UDim2.new(0.98, 0, 0.35, offsetY)
+	local targetPosition = UDim2.fromScale(0.98, 0.34)
 	TweenService:Create(frame, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 		Position = targetPosition,
 	}):Play()
@@ -363,7 +366,7 @@ local function showNotification(notificationType, message)
 		end
 
 		local outTween = TweenService:Create(frame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-			Position = UDim2.new(1.28, 0, 0.35, offsetY),
+			Position = UDim2.fromScale(1.28, 0.34),
 			BackgroundTransparency = 1,
 		})
 
@@ -393,9 +396,13 @@ local function createText(parent, name, textValue, position, size, font, color)
 	return text
 end
 
-local function addImageBackground(parent, imageId, imageTransparency, overlayTransparency)
+function addImageBackground(parent, imageId, imageTransparency, overlayTransparency)
 	if not hasCustomAssetId(imageId) then
 		return nil
+	end
+
+	if parent.BackgroundTransparency < 0.35 then
+		parent.BackgroundTransparency = 0.35
 	end
 
 	local image = Instance.new("ImageLabel")
@@ -505,6 +512,63 @@ local function startUpgradeIconPulse(icon)
 	end)
 end
 
+local function playPurchaseEffect(card, upgradeId)
+	local assetConfig = getUpgradeAssetConfig(upgradeId)
+	local effectImage = assetConfig.PurchaseEffectImage
+
+	for index = 1, 8 do
+		local angle = ((math.pi * 2) / 8) * index
+		local distance = 34 + (index % 3) * 12
+		local offset = Vector2.new(math.cos(angle) * distance, math.sin(angle) * distance)
+		local particle
+
+		if hasCustomAssetId(effectImage) then
+			particle = Instance.new("ImageLabel")
+			particle.BackgroundTransparency = 1
+			particle.Image = effectImage
+			particle.ImageTransparency = 0
+			particle.ScaleType = Enum.ScaleType.Fit
+		else
+			particle = Instance.new("Frame")
+			particle.BackgroundColor3 = Color3.fromRGB(255, 236, 130)
+			particle.BackgroundTransparency = 0.08
+			particle.BorderSizePixel = 0
+			addCorner(particle, UDim.new(1, 0))
+			addStroke(particle, Color3.fromRGB(255, 255, 225), 1, 0.25)
+		end
+
+		particle.Name = `PurchaseBurst{index}`
+		particle.AnchorPoint = Vector2.new(0.5, 0.5)
+		particle.Position = UDim2.fromScale(0.5, 0.52)
+		particle.Rotation = index * 18
+		particle.Size = UDim2.fromOffset(18, 18)
+		particle.ZIndex = 55
+		particle.Parent = card
+
+		local tween = TweenService:Create(particle, TweenInfo.new(0.62, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Position = UDim2.new(0.5, offset.X, 0.52, offset.Y),
+			Rotation = particle.Rotation + 120,
+			Size = UDim2.fromOffset(8, 8),
+		})
+
+		tween.Completed:Connect(function()
+			particle:Destroy()
+		end)
+
+		tween:Play()
+
+		if particle:IsA("ImageLabel") then
+			TweenService:Create(particle, TweenInfo.new(0.62, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				ImageTransparency = 1,
+			}):Play()
+		else
+			TweenService:Create(particle, TweenInfo.new(0.62, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				BackgroundTransparency = 1,
+			}):Play()
+		end
+	end
+end
+
 local function createUpgradeCard(parent, upgradeId, index)
 	local cardScale
 	local card = Instance.new("Frame")
@@ -521,7 +585,8 @@ local function createUpgradeCard(parent, upgradeId, index)
 	addCorner(card, UDim.new(0, 18))
 	local cardStroke = addStroke(card, Color3.fromRGB(215, 245, 175), 2, 0.18)
 	addGradient(card, Color3.fromRGB(44, 50, 43), Color3.fromRGB(13, 15, 14), 90)
-	addImageBackground(card, UPGRADE_CARD_BACKGROUND_IMAGE_ID, 0.16, 0.74)
+	local assetConfig = getUpgradeAssetConfig(upgradeId)
+	addImageBackground(card, assetConfig.BackgroundImage, 0.14, 0.78)
 
 	cardScale = Instance.new("UIScale")
 	cardScale.Scale = 1
@@ -577,7 +642,7 @@ local function createUpgradeCard(parent, upgradeId, index)
 	local icon = Instance.new("ImageLabel")
 	icon.Name = "Icon"
 	icon.BackgroundTransparency = 1
-	icon.Image = UPGRADE_ICONS[upgradeId] or "rbxassetid://0"
+	icon.Image = assetConfig.IconImage or "rbxassetid://0"
 	icon.Position = UDim2.fromScale(0.12, 0.12)
 	icon.ScaleType = Enum.ScaleType.Fit
 	icon.Size = UDim2.fromScale(0.76, 0.76)
@@ -601,7 +666,7 @@ local function createUpgradeCard(parent, upgradeId, index)
 	addCorner(badge, UDim.new(0, 13))
 	addStroke(badge, Color3.fromRGB(255, 255, 215), 1.2, 0.18)
 	addGradient(badge, Color3.fromRGB(230, 255, 155), Color3.fromRGB(85, 155, 70), 0)
-	addImageBackground(badge, UPGRADE_BONUS_BADGE_BACKGROUND_IMAGE_ID, 0.16, 0.76)
+	addImageBackground(badge, (UIAssetConfig.BonusBadge or {}).BackgroundImage, 0.14, 0.82)
 
 	local effect = createText(badge, "Effect", "+1", UDim2.fromScale(0.08, 0.05), UDim2.fromScale(0.84, 0.9), Enum.Font.GothamBlack, Color3.fromRGB(250, 255, 232))
 	effect.TextXAlignment = Enum.TextXAlignment.Center
@@ -613,8 +678,8 @@ local function createUpgradeCard(parent, upgradeId, index)
 	price.TextStrokeTransparency = 0.56
 
 	local tooltip = createText(card, "Tooltip", "+1", UDim2.fromScale(0.08, 0.64), UDim2.fromScale(0.42, 0.105), Enum.Font.GothamBlack, Color3.fromRGB(255, 252, 210))
-	tooltip.BackgroundColor3 = Color3.fromRGB(48, 56, 42)
-	tooltip.BackgroundTransparency = 0.14
+	tooltip.BackgroundColor3 = Color3.fromRGB(76, 88, 66)
+	tooltip.BackgroundTransparency = 0.22
 	tooltip.BorderSizePixel = 0
 	tooltip.TextXAlignment = Enum.TextXAlignment.Center
 	tooltip.Visible = false
@@ -623,7 +688,7 @@ local function createUpgradeCard(parent, upgradeId, index)
 	addCorner(tooltip, UDim.new(0, 10))
 	addStroke(tooltip, Color3.fromRGB(225, 240, 180), 1, 0.18)
 	addGradient(tooltip, Color3.fromRGB(42, 48, 34), Color3.fromRGB(10, 12, 9), 90)
-	addImageBackground(tooltip, UPGRADE_TOOLTIP_BACKGROUND_IMAGE_ID, 0.12, 0.8)
+	addImageBackground(tooltip, (UIAssetConfig.Tooltip or {}).BackgroundImage, 0.1, 0.86)
 
 	local buyButton = Instance.new("TextButton")
 	buyButton.Name = "Buy"
@@ -654,6 +719,7 @@ local function createUpgradeCard(parent, upgradeId, index)
 
 	local function hookButton(button, mode)
 		button.Activated:Connect(function()
+			pendingPurchaseEffectUpgradeId = upgradeId
 			buyUpgradeRemote:FireServer(upgradeId, mode)
 		end)
 
@@ -744,6 +810,7 @@ local function setupUpgradeBoard()
 	layout.CellSize = UDim2.fromOffset(CARD_WIDTH, CARD_HEIGHT)
 	layout.FillDirectionMaxCells = 3
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.Padding = UDim.new(0, 14)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.VerticalAlignment = Enum.VerticalAlignment.Center
 	layout.Parent = cardsFrame
@@ -831,6 +898,15 @@ upgradeResultRemote.OnClientEvent:Connect(function(result)
 		updateUpgradeBoard(result.Data)
 	end
 
+	if result.Type == "Success" and pendingPurchaseEffectUpgradeId then
+		local card = upgradeCards[pendingPurchaseEffectUpgradeId]
+
+		if card then
+			playPurchaseEffect(card.Frame, pendingPurchaseEffectUpgradeId)
+		end
+	end
+
+	pendingPurchaseEffectUpgradeId = nil
 	showNotification(result.Type or "Error", result.Message or "Ошибка покупки, попробуйте позже")
 end)
 
