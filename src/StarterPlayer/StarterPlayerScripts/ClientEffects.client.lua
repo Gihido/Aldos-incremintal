@@ -220,7 +220,7 @@ local function showCoinPickupPopup(amount)
 		backgroundImage.Position = UDim2.fromScale(0, 0)
 		backgroundImage.ScaleType = Enum.ScaleType.Stretch
 		backgroundImage.Size = UDim2.fromScale(1, 1)
-		backgroundImage.ZIndex = 20
+		backgroundImage.ZIndex = 80
 		backgroundImage.Parent = popup
 
 		darkOverlay = Instance.new("Frame")
@@ -229,7 +229,7 @@ local function showCoinPickupPopup(amount)
 		darkOverlay.BackgroundTransparency = 0.72
 		darkOverlay.BorderSizePixel = 0
 		darkOverlay.Size = UDim2.fromScale(1, 1)
-		darkOverlay.ZIndex = 21
+		darkOverlay.ZIndex = 81
 		darkOverlay.Parent = popup
 	end
 
@@ -240,7 +240,7 @@ local function showCoinPickupPopup(amount)
 	icon.Position = UDim2.fromOffset(10, 9)
 	icon.ScaleType = Enum.ScaleType.Fit
 	icon.Size = UDim2.fromOffset(28, 28)
-	icon.ZIndex = 22
+	icon.ZIndex = 82
 	icon.Parent = popup
 
 	local text = Instance.new("TextLabel")
@@ -254,7 +254,7 @@ local function showCoinPickupPopup(amount)
 	text.TextScaled = true
 	text.TextStrokeTransparency = 0.62
 	text.TextXAlignment = Enum.TextXAlignment.Left
-	text.ZIndex = 22
+	text.ZIndex = 82
 	text.Parent = popup
 
 	TweenService:Create(scale, TweenInfo.new(0.14, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
@@ -301,6 +301,7 @@ local function showNotification(notificationType, message)
 	local assetConfig = getNotificationAssetConfig(notificationType)
 	local screenGui = getOrCreateScreenGui()
 	notificationCount += 1
+	local offsetY = ((notificationCount - 1) % 3) * 4
 
 	local frame = Instance.new("Frame")
 	frame.Name = `Notification{notificationCount}`
@@ -804,8 +805,10 @@ local function setupUpgradeBoard()
 	cardsFrame.Size = UDim2.fromScale(0.93, 0.76)
 	cardsFrame.Parent = background
 
-	local layout = Instance.new("UIListLayout")
-	layout.FillDirection = Enum.FillDirection.Horizontal
+	local layout = Instance.new("UIGridLayout")
+	layout.CellPadding = UDim2.fromOffset(12, 12)
+	layout.CellSize = UDim2.fromOffset(CARD_WIDTH, CARD_HEIGHT)
+	layout.FillDirectionMaxCells = 3
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	layout.Padding = UDim.new(0, 14)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
