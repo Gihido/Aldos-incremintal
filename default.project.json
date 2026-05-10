@@ -1,0 +1,25 @@
+{
+  "name": "Aldos-incremintal",
+  "tree": {
+    "$className": "DataModel",
+    "Workspace": {
+      "$path": "src/Workspace"
+    },
+    "ServerScriptService": {
+      "$path": "src/ServerScriptService"
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "$path": "src/StarterPlayer/StarterPlayerScripts"
+      }
+    },
+    "ReplicatedStorage": {
+      "Remotes": {
+        "$path": "src/ReplicatedStorage/Remotes"
+      }
+    },
+    "ServerStorage": {
+      "$path": "src/ServerStorage"
+    }
+  }
+}
