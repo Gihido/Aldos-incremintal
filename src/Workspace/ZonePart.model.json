@@ -1,0 +1,13 @@
+{
+  "ClassName": "Part",
+  "Properties": {
+    "Name": "ZonePart",
+    "Anchored": true,
+    "CanCollide": false,
+    "Color": [0.13, 0.5, 1],
+    "Material": "ForceField",
+    "Position": [0, 1, 0],
+    "Size": [16, 2, 16],
+    "Transparency": 0.55
+  }
+}

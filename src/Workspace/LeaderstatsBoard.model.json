@@ -1,0 +1,12 @@
+{
+  "ClassName": "Part",
+  "Properties": {
+    "Name": "LeaderstatsBoard",
+    "Anchored": true,
+    "CanCollide": true,
+    "Color": [0.08, 0.08, 0.1],
+    "Material": "SmoothPlastic",
+    "Position": [0, 8, -14],
+    "Size": [14, 8, 1]
+  }
+}
