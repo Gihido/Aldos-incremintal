@@ -11,14 +11,14 @@ local UPGRADE_DEFINITIONS = {
 	CoinGain = {
 		Name = "Coin Gain",
 		BasePrice = 2,
-		PriceMultiplier = 2,
+		PriceMultiplier = 1.25,
 		MaxLevel = 15,
 		Order = 1,
 	},
 	MultiCoins = {
 		Name = "Multi Coins",
 		BasePrice = 5,
-		PriceMultiplier = 1.5,
+		PriceMultiplier = 1.3,
 		MaxLevel = 20,
 		Order = 2,
 	},
