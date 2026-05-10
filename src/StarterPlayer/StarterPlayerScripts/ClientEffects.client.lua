@@ -1,12 +1,12 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local shared = ReplicatedStorage:WaitForChild("Shared")
 local FormatNumber = require(shared:WaitForChild("FormatNumber"))
 local UIAssetConfig = require(shared:WaitForChild("UIAssetConfig"))
-local ResponsiveUI = require(shared:WaitForChild("ResponsiveUI"))
 
 local NOTIFICATION_CONFIG = {
 	Success = {
@@ -23,6 +23,9 @@ local NOTIFICATION_CONFIG = {
 	},
 }
 
+local ROTATION_SPEED_DEGREES = 30
+local BOB_HEIGHT = 0.45
+local BOB_SPEED = 2.2
 local UPGRADE_ORDER = { "CoinGain", "MultiCoins", "MaxSpawnCoins" }
 local CARD_WIDTH = 330
 local CARD_HEIGHT = 250
@@ -34,6 +37,7 @@ local buyUpgradeRemote = remotes:WaitForChild("BuyUpgrade")
 local upgradeResultRemote = remotes:WaitForChild("UpgradeResult")
 local syncPlayerDataRemote = remotes:WaitForChild("SyncPlayerData")
 
+local animatedCoins = {}
 local latestPlayerData
 local upgradeCards = {}
 local notificationCount = 0
@@ -98,6 +102,65 @@ local function addGradient(parent, colorA, colorB, rotation)
 	return gradient
 end
 
+local function getCoinCFrame(coin)
+	if coin:IsA("BasePart") then
+		return coin.CFrame
+	end
+
+	if coin:IsA("Model") then
+		return coin:GetPivot()
+	end
+
+	return nil
+end
+
+local function setCoinCFrame(coin, cframe)
+	if coin:IsA("BasePart") then
+		coin.CFrame = cframe
+	elseif coin:IsA("Model") then
+		coin:PivotTo(cframe)
+	end
+end
+
+local function isAnimatableCoin(instance)
+	return (instance:IsA("BasePart") or instance:IsA("Model")) and instance:GetAttribute("IsCoin") == true
+end
+
+local function stopAnimatingCoin(coin)
+	animatedCoins[coin] = nil
+end
+
+local function startAnimatingCoin(coin)
+	if animatedCoins[coin] or not isAnimatableCoin(coin) then
+		return
+	end
+
+	local baseCFrame = getCoinCFrame(coin)
+
+	if not baseCFrame then
+		return
+	end
+
+	animatedCoins[coin] = {
+		BaseCFrame = baseCFrame,
+		Phase = math.random() * math.pi * 2,
+	}
+
+	coin.AncestryChanged:Connect(function(_, parent)
+		if not parent then
+			stopAnimatingCoin(coin)
+		end
+	end)
+end
+
+local function scanForCoins(container)
+	for _, descendant in container:GetDescendants() do
+		if isAnimatableCoin(descendant) then
+			startAnimatingCoin(descendant)
+		end
+	end
+end
+
 local function cleanupLegacyCoinPickupEffects()
 	local playerGui = getPlayerGui()
 
@@ -130,13 +193,7 @@ local function showCoinPickupPopup(amount)
 	popup.BackgroundTransparency = 0.12
 	popup.BorderSizePixel = 0
 	popup.ClipsDescendants = true
-	local isMobileLike = ResponsiveUI.IsMobileLike()
-	local minX = isMobileLike and 0.25 or 0.2
-	local maxX = isMobileLike and 0.75 or 0.8
-	local randomX = minX + (math.random() * (maxX - minX))
-	local randomY = 0.72 + (math.random() * 0.14)
-
-	popup.Position = UDim2.fromScale(randomX, randomY)
+	popup.Position = UDim2.fromScale(0.5 + math.random(-4, 4) / 100, 0.58)
 	popup.Size = UDim2.fromOffset(145, 48)
 	popup.ZIndex = 20
 	popup.Parent = screenGui
@@ -145,9 +202,8 @@ local function showCoinPickupPopup(amount)
 	addStroke(popup, Color3.fromRGB(218, 218, 218), 1.5, 0.22)
 	addGradient(popup, Color3.fromRGB(96, 96, 102), Color3.fromRGB(42, 42, 46), 90)
 
-	local targetScale = ResponsiveUI.GetScreenScale()
 	local scale = Instance.new("UIScale")
-	scale.Scale = targetScale * 0.88
+	scale.Scale = 0.88
 	scale.Parent = popup
 
 	local backgroundImage
@@ -164,7 +220,7 @@ local function showCoinPickupPopup(amount)
 		backgroundImage.Position = UDim2.fromScale(0, 0)
 		backgroundImage.ScaleType = Enum.ScaleType.Stretch
 		backgroundImage.Size = UDim2.fromScale(1, 1)
-		backgroundImage.ZIndex = 20
+		backgroundImage.ZIndex = 80
 		backgroundImage.Parent = popup
 
 		darkOverlay = Instance.new("Frame")
@@ -173,7 +229,7 @@ local function showCoinPickupPopup(amount)
 		darkOverlay.BackgroundTransparency = 0.72
 		darkOverlay.BorderSizePixel = 0
 		darkOverlay.Size = UDim2.fromScale(1, 1)
-		darkOverlay.ZIndex = 21
+		darkOverlay.ZIndex = 81
 		darkOverlay.Parent = popup
 	end
 
@@ -184,7 +240,7 @@ local function showCoinPickupPopup(amount)
 	icon.Position = UDim2.fromOffset(10, 9)
 	icon.ScaleType = Enum.ScaleType.Fit
 	icon.Size = UDim2.fromOffset(28, 28)
-	icon.ZIndex = 22
+	icon.ZIndex = 82
 	icon.Parent = popup
 
 	local text = Instance.new("TextLabel")
@@ -198,22 +254,15 @@ local function showCoinPickupPopup(amount)
 	text.TextScaled = true
 	text.TextStrokeTransparency = 0.62
 	text.TextXAlignment = Enum.TextXAlignment.Left
-	text.ZIndex = 22
+	text.ZIndex = 82
 	text.Parent = popup
 
 	TweenService:Create(scale, TweenInfo.new(0.14, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		Scale = targetScale,
+		Scale = 1,
 	}):Play()
 
-	local startPosition = popup.Position
-	local endPosition = UDim2.new(
-		startPosition.X.Scale,
-		startPosition.X.Offset,
-		startPosition.Y.Scale,
-		startPosition.Y.Offset - 65
-	)
 	local moveTween = TweenService:Create(popup, TweenInfo.new(0.95, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Position = endPosition,
+		Position = popup.Position - UDim2.fromOffset(0, 58),
 		BackgroundTransparency = 1,
 	})
 	local textTween = TweenService:Create(text, TweenInfo.new(0.95, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
@@ -252,19 +301,18 @@ local function showNotification(notificationType, message)
 	local assetConfig = getNotificationAssetConfig(notificationType)
 	local screenGui = getOrCreateScreenGui()
 	notificationCount += 1
+	local offsetY = ((notificationCount - 1) % 3) * 4
 
 	local frame = Instance.new("Frame")
 	frame.Name = `Notification{notificationCount}`
-	local notificationIsMobile = ResponsiveUI.IsMobileLike()
-	frame.AnchorPoint = notificationIsMobile and Vector2.new(0.5, 0.5) or Vector2.new(1, 0.5)
+	frame.AnchorPoint = Vector2.new(1, 0.5)
 	frame.BackgroundColor3 = config.Color
 	frame.BackgroundTransparency = 0.16
 	frame.BorderSizePixel = 0
-	frame.Position = notificationIsMobile and UDim2.fromScale(0.5, 0.22) or UDim2.fromScale(1.28, 0.34)
-	frame.Size = notificationIsMobile and UDim2.fromOffset(260, 58) or UDim2.fromOffset(310, 60)
+	frame.Position = UDim2.fromScale(1.28, 0.34)
+	frame.Size = UDim2.fromOffset(310, 60)
 	frame.ZIndex = 100 + notificationCount
 	frame.Parent = screenGui
-	ResponsiveUI.ApplyScale(frame)
 
 	addCorner(frame, UDim.new(0, 14))
 	addStroke(frame, Color3.fromRGB(255, 255, 255), 2, 0.18)
@@ -307,7 +355,7 @@ local function showNotification(notificationType, message)
 	label.ZIndex = frame.ZIndex + 2
 	label.Parent = frame
 
-	local targetPosition = notificationIsMobile and UDim2.fromScale(0.5, 0.22) or UDim2.fromScale(0.98, 0.34)
+	local targetPosition = UDim2.fromScale(0.98, 0.34)
 	TweenService:Create(frame, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 		Position = targetPosition,
 	}):Play()
@@ -318,7 +366,7 @@ local function showNotification(notificationType, message)
 		end
 
 		local outTween = TweenService:Create(frame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-			Position = notificationIsMobile and UDim2.fromScale(0.5, -0.12) or UDim2.fromScale(1.28, 0.34),
+			Position = UDim2.fromScale(1.28, 0.34),
 			BackgroundTransparency = 1,
 		})
 
@@ -728,16 +776,12 @@ local function setupUpgradeBoard()
 		surfaceGui = Instance.new("SurfaceGui")
 		surfaceGui.Name = "CoinUpgradeSurfaceGui"
 		surfaceGui.Face = Enum.NormalId.Front
-		surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
-		surfaceGui.CanvasSize = Vector2.new(1600, 900)
-		surfaceGui.PixelsPerStud = 75
+		surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		surfaceGui.PixelsPerStud = 70
 		surfaceGui.LightInfluence = 0
 		surfaceGui.Parent = boardPart
 	else
 		surfaceGui:ClearAllChildren()
-		surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
-		surfaceGui.CanvasSize = Vector2.new(1600, 900)
-		surfaceGui.PixelsPerStud = 75
 	end
 
 	local background = Instance.new("Frame")
@@ -761,8 +805,10 @@ local function setupUpgradeBoard()
 	cardsFrame.Size = UDim2.fromScale(0.93, 0.76)
 	cardsFrame.Parent = background
 
-	local layout = Instance.new("UIListLayout")
-	layout.FillDirection = Enum.FillDirection.Horizontal
+	local layout = Instance.new("UIGridLayout")
+	layout.CellPadding = UDim2.fromOffset(12, 12)
+	layout.CellSize = UDim2.fromOffset(CARD_WIDTH, CARD_HEIGHT)
+	layout.FillDirectionMaxCells = 3
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	layout.Padding = UDim.new(0, 14)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -806,6 +852,38 @@ local function updateUpgradeBoard(data)
 	end
 end
 
+Workspace.DescendantAdded:Connect(function(descendant)
+	if isAnimatableCoin(descendant) then
+		startAnimatingCoin(descendant)
+		return
+	end
+
+	descendant:GetAttributeChangedSignal("IsCoin"):Connect(function()
+		if isAnimatableCoin(descendant) then
+			startAnimatingCoin(descendant)
+		end
+	end)
+end)
+
+RunService.RenderStepped:Connect(function()
+	local now = os.clock()
+
+	for coin, animation in animatedCoins do
+		if not coin.Parent or coin:GetAttribute("IsCoin") ~= true then
+			stopAnimatingCoin(coin)
+		else
+			local bobOffset = math.sin((now * BOB_SPEED) + animation.Phase) * BOB_HEIGHT
+			local rotation = math.rad((now * ROTATION_SPEED_DEGREES) % 360)
+			local animatedCFrame = animation.BaseCFrame * CFrame.new(0, bobOffset, 0) * CFrame.Angles(0, rotation, 0)
+			local success = pcall(setCoinCFrame, coin, animatedCFrame)
+
+			if not success then
+				stopAnimatingCoin(coin)
+			end
+		end
+	end
+end)
+
 coinCollectedEffect.OnClientEvent:Connect(function(amount)
 	showCoinPickupPopup(amount)
 end)
@@ -838,3 +916,4 @@ end)
 
 getOrCreateScreenGui()
 setupUpgradeBoard()
+scanForCoins(Workspace)
