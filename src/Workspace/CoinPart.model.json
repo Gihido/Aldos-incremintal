@@ -1,0 +1,13 @@
+{
+  "ClassName": "Part",
+  "Properties": {
+    "Name": "CoinPart",
+    "Anchored": true,
+    "CanCollide": false,
+    "Color": [1, 0.78, 0.08],
+    "Material": "Neon",
+    "Position": [0, 4, 0],
+    "Shape": "Cylinder",
+    "Size": [0.4, 3, 3]
+  }
+}
