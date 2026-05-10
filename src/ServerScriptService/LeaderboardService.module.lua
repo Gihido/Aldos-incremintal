@@ -8,6 +8,10 @@ local FormatNumber = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChi
 
 local BOARD_BACKGROUND_IMAGE_ID = "rbxassetid://0"
 local BOARD_UPDATE_SECONDS = 2.5
+
+local function hasCustomAssetId(assetId)
+	return type(assetId) == "string" and assetId ~= "" and assetId ~= "rbxassetid://0"
+end
 local MAX_LEADERBOARD_ROWS = 100
 
 local LeaderboardService = {}
@@ -197,16 +201,18 @@ local function setupBoard()
 
 	rowLabels = {}
 
-	local backgroundImage = Instance.new("ImageLabel")
-	backgroundImage.Name = "BackgroundImage"
-	backgroundImage.Size = UDim2.fromScale(1, 1)
-	backgroundImage.Position = UDim2.fromScale(0, 0)
-	backgroundImage.BackgroundTransparency = 1
-	backgroundImage.Image = BOARD_BACKGROUND_IMAGE_ID
-	backgroundImage.ImageTransparency = 0.42
-	backgroundImage.ScaleType = Enum.ScaleType.Stretch
-	backgroundImage.ZIndex = 0
-	backgroundImage.Parent = surfaceGui
+	if hasCustomAssetId(BOARD_BACKGROUND_IMAGE_ID) then
+		local backgroundImage = Instance.new("ImageLabel")
+		backgroundImage.Name = "BackgroundImage"
+		backgroundImage.Size = UDim2.fromScale(1, 1)
+		backgroundImage.Position = UDim2.fromScale(0, 0)
+		backgroundImage.BackgroundTransparency = 1
+		backgroundImage.Image = BOARD_BACKGROUND_IMAGE_ID
+		backgroundImage.ImageTransparency = 0.42
+		backgroundImage.ScaleType = Enum.ScaleType.Stretch
+		backgroundImage.ZIndex = 0
+		backgroundImage.Parent = surfaceGui
+	end
 
 	local darkOverlay = Instance.new("Frame")
 	darkOverlay.Name = "DarkOverlay"
@@ -232,7 +238,7 @@ local function setupBoard()
 	createStroke(panel, Color3.fromRGB(225, 230, 180), 3, 0.08)
 	createGradient(panel, Color3.fromRGB(28, 32, 34), Color3.fromRGB(8, 9, 12), 90)
 
-	local title = createTextLabel(panel, "Title", "ТОП 100 ИГРОКОВ", UDim2.fromScale(0.96, 0.095), UDim2.fromScale(0.02, 0.018), Enum.TextXAlignment.Center)
+	local title = createTextLabel(panel, "Title", "ТОП 100 ИГРОКОВ", UDim2.fromScale(0.96, 0.075), UDim2.fromScale(0.02, 0.02), Enum.TextXAlignment.Center)
 	title.Font = Enum.Font.GothamBlack
 	title.TextColor3 = Color3.fromRGB(235, 235, 210)
 	title.TextStrokeTransparency = 0.38
@@ -242,7 +248,7 @@ local function setupBoard()
 	header.BackgroundColor3 = Color3.fromRGB(210, 220, 150)
 	header.BackgroundTransparency = 0.08
 	header.BorderSizePixel = 0
-	header.Position = UDim2.fromScale(0.03, 0.135)
+	header.Position = UDim2.fromScale(0.03, 0.125)
 	header.Size = UDim2.fromScale(0.94, 0.058)
 	header.ZIndex = 3
 	header.Parent = panel
@@ -265,10 +271,10 @@ local function setupBoard()
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0
 	list.CanvasSize = UDim2.fromOffset(0, MAX_LEADERBOARD_ROWS * 37)
-	list.Position = UDim2.fromScale(0.03, 0.21)
+	list.Position = UDim2.fromScale(0.03, 0.20)
 	list.ScrollBarImageColor3 = Color3.fromRGB(225, 230, 180)
 	list.ScrollBarThickness = 8
-	list.Size = UDim2.fromScale(0.94, 0.755)
+	list.Size = UDim2.fromScale(0.94, 0.765)
 	list.ZIndex = 3
 	list.Parent = panel
 
