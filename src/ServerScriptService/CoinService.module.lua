@@ -155,12 +155,12 @@ local function spawnCoin()
 		coin:SetAttribute("Collected", true)
 
 		local amount = UpgradeService.GetCoinsPerPickup(player)
-		local totalCoins = DataService.AddCoins(player, amount)
+		local newCoinBalance = DataService.AddCoins(player, amount)
 		local leaderstats = player:FindFirstChild("leaderstats")
 		local coins = leaderstats and leaderstats:FindFirstChild("Coins")
 
 		if coins then
-			coins.Value = totalCoins
+			coins.Value = newCoinBalance
 		end
 
 		coinCollectedEffect:FireClient(player, amount)
