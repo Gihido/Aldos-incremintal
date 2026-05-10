@@ -7,6 +7,7 @@ local Workspace = game:GetService("Workspace")
 local FormatNumber = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("FormatNumber"))
 
 local COIN_POPUP_ICON_ID = "rbxassetid://0"
+local COIN_POPUP_BACKGROUND_IMAGE_ID = "rbxassetid://0"
 local UPGRADE_ICONS = {
 	CoinGain = "rbxassetid://0",
 	MultiCoins = "rbxassetid://0",
@@ -85,6 +86,11 @@ local function addStroke(parent, color, thickness, transparency)
 	return stroke
 end
 
+
+local function hasCustomAssetId(assetId)
+	return type(assetId) == "string" and assetId ~= "" and assetId ~= "rbxassetid://0"
+end
+
 local function addGradient(parent, colorA, colorB, rotation)
 	local gradient = Instance.new("UIGradient")
 	gradient.Color = ColorSequence.new(colorA, colorB)
@@ -153,55 +159,104 @@ local function scanForCoins(container)
 	end
 end
 
-local function showCoinPopup(amount)
+local function showCoinPickupPopup(amount)
 	local screenGui = getOrCreateScreenGui()
 	local popup = Instance.new("Frame")
 	popup.Name = "CoinPickupPopup"
 	popup.AnchorPoint = Vector2.new(0.5, 0.5)
-	popup.BackgroundColor3 = Color3.fromRGB(22, 22, 24)
-	popup.BackgroundTransparency = 0.1
+	popup.BackgroundColor3 = Color3.fromRGB(74, 74, 78)
+	popup.BackgroundTransparency = 0.12
 	popup.BorderSizePixel = 0
-	popup.Position = UDim2.fromScale(0.5 + math.random(-8, 8) / 100, 0.55)
-	popup.Size = UDim2.fromOffset(116, 38)
+	popup.ClipsDescendants = true
+	popup.Position = UDim2.fromScale(0.5 + math.random(-7, 7) / 100, 0.57)
+	popup.Size = UDim2.fromOffset(145, 46)
+	popup.ZIndex = 20
 	popup.Parent = screenGui
 
-	addCorner(popup, UDim.new(0, 12))
-	addStroke(popup, Color3.fromRGB(225, 225, 205), 1.5, 0.25)
-	addGradient(popup, Color3.fromRGB(50, 50, 54), Color3.fromRGB(16, 16, 18), 90)
+	addCorner(popup, UDim.new(0, 13))
+	addStroke(popup, Color3.fromRGB(218, 218, 218), 1.5, 0.22)
+	addGradient(popup, Color3.fromRGB(96, 96, 102), Color3.fromRGB(42, 42, 46), 90)
+
+	local scale = Instance.new("UIScale")
+	scale.Scale = 0.88
+	scale.Parent = popup
+
+	local backgroundImage
+	local darkOverlay
+
+	if hasCustomAssetId(COIN_POPUP_BACKGROUND_IMAGE_ID) then
+		backgroundImage = Instance.new("ImageLabel")
+		backgroundImage.Name = "PopupBackgroundImage"
+		backgroundImage.BackgroundTransparency = 1
+		backgroundImage.Image = COIN_POPUP_BACKGROUND_IMAGE_ID
+		backgroundImage.ImageTransparency = 0.32
+		backgroundImage.Position = UDim2.fromScale(0, 0)
+		backgroundImage.ScaleType = Enum.ScaleType.Stretch
+		backgroundImage.Size = UDim2.fromScale(1, 1)
+		backgroundImage.ZIndex = 20
+		backgroundImage.Parent = popup
+
+		darkOverlay = Instance.new("Frame")
+		darkOverlay.Name = "PopupDarkOverlay"
+		darkOverlay.BackgroundColor3 = Color3.fromRGB(24, 24, 26)
+		darkOverlay.BackgroundTransparency = 0.38
+		darkOverlay.BorderSizePixel = 0
+		darkOverlay.Size = UDim2.fromScale(1, 1)
+		darkOverlay.ZIndex = 21
+		darkOverlay.Parent = popup
+	end
 
 	local icon = Instance.new("ImageLabel")
 	icon.Name = "Icon"
 	icon.BackgroundTransparency = 1
 	icon.Image = COIN_POPUP_ICON_ID
-	icon.Position = UDim2.fromOffset(8, 7)
+	icon.Position = UDim2.fromOffset(10, 9)
 	icon.ScaleType = Enum.ScaleType.Fit
-	icon.Size = UDim2.fromOffset(24, 24)
+	icon.Size = UDim2.fromOffset(28, 28)
+	icon.ZIndex = 22
 	icon.Parent = popup
 
 	local text = Instance.new("TextLabel")
 	text.Name = "Amount"
 	text.BackgroundTransparency = 1
 	text.Font = Enum.Font.GothamBlack
-	text.Position = UDim2.fromOffset(38, 0)
-	text.Size = UDim2.new(1, -44, 1, 0)
+	text.Position = UDim2.fromOffset(45, 0)
+	text.Size = UDim2.new(1, -54, 1, 0)
 	text.Text = `+{FormatNumber(amount)}`
-	text.TextColor3 = Color3.fromRGB(245, 240, 205)
+	text.TextColor3 = Color3.fromRGB(248, 248, 236)
 	text.TextScaled = true
-	text.TextStrokeTransparency = 0.72
+	text.TextStrokeTransparency = 0.62
 	text.TextXAlignment = Enum.TextXAlignment.Left
+	text.ZIndex = 22
 	text.Parent = popup
 
-	local moveTween = TweenService:Create(popup, TweenInfo.new(0.75, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Position = popup.Position - UDim2.fromScale(0, 0.085),
+	TweenService:Create(scale, TweenInfo.new(0.14, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Scale = 1,
+	}):Play()
+
+	local moveTween = TweenService:Create(popup, TweenInfo.new(0.95, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Position = popup.Position - UDim2.fromOffset(0, 58),
 		BackgroundTransparency = 1,
 	})
-	local textTween = TweenService:Create(text, TweenInfo.new(0.75, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+	local textTween = TweenService:Create(text, TweenInfo.new(0.95, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		TextTransparency = 1,
 		TextStrokeTransparency = 1,
 	})
-	local iconTween = TweenService:Create(icon, TweenInfo.new(0.75, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+	local iconTween = TweenService:Create(icon, TweenInfo.new(0.95, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		ImageTransparency = 1,
 	})
+
+	if backgroundImage then
+		TweenService:Create(backgroundImage, TweenInfo.new(0.95, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			ImageTransparency = 1,
+		}):Play()
+	end
+
+	if darkOverlay then
+		TweenService:Create(darkOverlay, TweenInfo.new(0.95, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundTransparency = 1,
+		}):Play()
+	end
 
 	moveTween.Completed:Connect(function()
 		popup:Destroy()
@@ -440,11 +495,28 @@ local function createUpgradeCard(parent, upgradeId, index)
 	upgradeCards[upgradeId] = cardData
 end
 
+local function findUpgradeBoardPart()
+	local upgCoin = Workspace:WaitForChild("UpgCoin", 10)
+
+	if upgCoin then
+		return upgCoin
+	end
+
+	upgCoin = Workspace:FindFirstChild("UpgCoin")
+		or Workspace:FindFirstChild("UPGCoin")
+		or Workspace:FindFirstChild("UpgradeCoin")
+
+	if not upgCoin then
+		warn("UpgCoin was not found in Workspace after 10 seconds; upgrade board will be skipped")
+	end
+
+	return upgCoin
+end
+
 local function setupUpgradeBoard()
-	local boardPart = Workspace:FindFirstChild("UpgCoin")
+	local boardPart = findUpgradeBoardPart()
 
 	if not boardPart then
-		warn("UpgCoin was not found in Workspace; upgrade board will be skipped")
 		return
 	end
 
@@ -559,7 +631,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 coinCollectedEffect.OnClientEvent:Connect(function(amount)
-	showCoinPopup(amount)
+	showCoinPickupPopup(amount)
 end)
 
 upgradeResultRemote.OnClientEvent:Connect(function(result)

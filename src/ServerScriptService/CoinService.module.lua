@@ -17,7 +17,6 @@ local CoinService = {}
 local coinTemplate
 local zonePart
 local coinCollectedEffect
-local syncPlayerDataRemote
 local activeCoins = {}
 local fillLoopStarted = false
 local random = Random.new()
@@ -167,10 +166,6 @@ local function spawnCoin()
 		coinCollectedEffect:FireClient(player, amount)
 		UpgradeService.SyncPlayer(player)
 
-		if syncPlayerDataRemote then
-			syncPlayerDataRemote:FireClient(player, UpgradeService.BuildPlayerPayload(player))
-		end
-
 		removeActiveCoin(coin)
 		coin:Destroy()
 
@@ -220,7 +215,6 @@ function CoinService.Init(remotes)
 	coinTemplate = ServerStorage:WaitForChild("CoinPart")
 	zonePart = Workspace:WaitForChild("ZonePart")
 	coinCollectedEffect = remotes.CoinCollectedEffect or ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CoinCollectedEffect")
-	syncPlayerDataRemote = remotes.SyncPlayerData
 
 	UpgradeService.OnMaxCoinsChanged(function()
 		CoinService.FillCoinsToLimit()

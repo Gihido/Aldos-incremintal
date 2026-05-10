@@ -50,9 +50,14 @@ ReplicatedStorage
 ## Asset IDs to replace
 
 - Pickup popup icon: `COIN_POPUP_ICON_ID` in `src/StarterPlayer/StarterPlayerScripts/ClientEffects.client.lua`.
+- Pickup popup background image: `COIN_POPUP_BACKGROUND_IMAGE_ID` in `src/StarterPlayer/StarterPlayerScripts/ClientEffects.client.lua` (leave `rbxassetid://0` for the default grey frame).
 - Upgrade icons: `UPGRADE_ICONS` in `src/StarterPlayer/StarterPlayerScripts/ClientEffects.client.lua`.
 - Notification icons/colors: `NOTIFICATION_CONFIG` in `src/StarterPlayer/StarterPlayerScripts/ClientEffects.client.lua`.
 - Leaderboard background image: `BOARD_BACKGROUND_IMAGE_ID` in `src/ServerScriptService/LeaderboardService.module.lua`.
+
+## Workspace notes
+
+The upgrade board part must be named exactly `UpgCoin` in `Workspace`. The client also checks `UPGCoin` and `UpgradeCoin` as fallbacks, but the intended name is `UpgCoin`.
 
 ## Studio DataStore note
 
