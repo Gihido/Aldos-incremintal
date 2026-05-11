@@ -30,7 +30,7 @@ local function deepCopy(value)
 
 	local copy = {}
 
-	for key, childValue in value do
+	for key, childValue in pairs(value) do
 		copy[key] = deepCopy(childValue)
 	end
 
@@ -63,7 +63,7 @@ local function mergeWithDefaults(savedData)
 	end
 
 	if type(savedData.Upgrades) == "table" then
-		for upgradeId, defaultLevel in DEFAULT_DATA.Upgrades do
+		for upgradeId, defaultLevel in pairs(DEFAULT_DATA.Upgrades) do
 			data.Upgrades[upgradeId] = math.max(0, math.floor(sanitizeNumber(savedData.Upgrades[upgradeId], defaultLevel)))
 		end
 	end
@@ -217,7 +217,7 @@ function DataService.Init()
 		while true do
 			task.wait(AUTOSAVE_SECONDS)
 
-			for _, player in Players:GetPlayers() do
+			for _, player in ipairs(Players:GetPlayers()) do
 				DataService.Save(player, true)
 			end
 		end

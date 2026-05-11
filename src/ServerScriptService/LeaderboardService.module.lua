@@ -12,12 +12,47 @@ local BOARD_UPDATE_SECONDS = 2.5
 local function hasCustomAssetId(assetId)
 	return type(assetId) == "string" and assetId ~= "" and assetId ~= "rbxassetid://0"
 end
+local function getGameFont()
+	return (UIAssetConfig.Fonts and UIAssetConfig.Fonts.Main) or Enum.Font.Arcade
+end
+
+local function applyAnimatedTextGradient(textObject)
+	if not textObject or not (textObject:IsA("TextLabel") or textObject:IsA("TextButton") or textObject:IsA("TextBox")) then
+		return nil
+	end
+
+	local gradient = Instance.new("UIGradient")
+	gradient.Name = "AnimatedTextGradient"
+	gradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+		ColorSequenceKeypoint.new(0.48, Color3.fromRGB(105, 105, 105)),
+		ColorSequenceKeypoint.new(0.72, Color3.fromRGB(18, 18, 18)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+	})
+	gradient.Offset = Vector2.new(-1, 0)
+	gradient.Parent = textObject
+
+	task.spawn(function()
+		while gradient.Parent == textObject do
+			gradient.Offset = Vector2.new(-1, 0)
+			local tween = TweenService:Create(gradient, TweenInfo.new(2.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+				Offset = Vector2.new(1, 0),
+			})
+			tween:Play()
+			tween.Completed:Wait()
+		end
+	end)
+
+	return gradient
+end
+
 local MAX_LEADERBOARD_ROWS = 100
 
 local LeaderboardService = {}
 
 local rowLabels = {}
 local updateLoopStarted = false
+local getCoins
 
 local function createCorner(parent, radius)
 	local corner = Instance.new("UICorner")
@@ -46,6 +81,89 @@ local function createGradient(parent, colorA, colorB, rotation)
 	return gradient
 end
 
+local function applyCoinsBillboardGradient(textObject)
+	local gradient = Instance.new("UIGradient")
+	gradient.Name = "CoinsBillboardGradient"
+	gradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 245, 90)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 140, 35)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 245, 90)),
+	})
+	gradient.Offset = Vector2.new(-1, 0)
+	gradient.Parent = textObject
+
+	task.spawn(function()
+		while gradient.Parent == textObject do
+			gradient.Offset = Vector2.new(-1, 0)
+			local tween = TweenService:Create(gradient, TweenInfo.new(2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+				Offset = Vector2.new(1, 0),
+			})
+			tween:Play()
+			tween.Completed:Wait()
+		end
+	end)
+end
+
+local function getBillboardAdornee(character)
+	return character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+end
+
+local function updateCoinsBillboardText(player)
+	local character = player.Character
+	local billboard = character and character:FindFirstChild("CoinsBillboard", true)
+	local label = billboard and billboard:FindFirstChild("CoinsText", true)
+
+	if not label then
+		return
+	end
+
+	label.Text = `Coins: {FormatNumber(getCoins(player))}`
+end
+
+local function setupCoinsBillboard(player)
+	local character = player.Character
+
+	if not character then
+		return
+	end
+
+	local adornee = getBillboardAdornee(character)
+
+	if not adornee then
+		return
+	end
+
+	local existing = character:FindFirstChild("CoinsBillboard", true)
+
+	if existing then
+		existing:Destroy()
+	end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "CoinsBillboard"
+	billboard.AlwaysOnTop = true
+	billboard.BackgroundTransparency = 1
+	billboard.LightInfluence = 0
+	billboard.MaxDistance = 120
+	billboard.Size = UDim2.fromOffset(220, 44)
+	billboard.StudsOffsetWorldSpace = Vector3.new(0, 3.2, 0)
+	billboard.Parent = adornee
+
+	local label = Instance.new("TextLabel")
+	label.Name = "CoinsText"
+	label.BackgroundTransparency = 1
+	label.BorderSizePixel = 0
+	label.Font = getGameFont()
+	label.Size = UDim2.fromScale(1, 1)
+	label.Text = `Coins: {FormatNumber(getCoins(player))}`
+	label.TextColor3 = Color3.fromRGB(255, 235, 90)
+	label.TextScaled = true
+	label.TextStrokeColor3 = Color3.fromRGB(35, 20, 0)
+	label.TextStrokeTransparency = 0.25
+	label.Parent = billboard
+	applyCoinsBillboardGradient(label)
+end
+
 local function createLeaderstats(player)
 	local data = DataService.Get(player)
 	local leaderstats = player:FindFirstChild("leaderstats")
@@ -65,9 +183,26 @@ local function createLeaderstats(player)
 	end
 
 	coins.Value = data.Coins
+
+	if not player:GetAttribute("CoinsBillboardHooked") then
+		player:SetAttribute("CoinsBillboardHooked", true)
+		player.CharacterAdded:Connect(function()
+			task.defer(function()
+				setupCoinsBillboard(player)
+				updateCoinsBillboardText(player)
+			end)
+		end)
+
+		coins:GetPropertyChangedSignal("Value"):Connect(function()
+			updateCoinsBillboardText(player)
+		end)
+	end
+
+	setupCoinsBillboard(player)
+	updateCoinsBillboardText(player)
 end
 
-local function getCoins(player)
+function getCoins(player)
 	local leaderstats = player:FindFirstChild("leaderstats")
 	local coins = leaderstats and leaderstats:FindFirstChild("Coins")
 
@@ -77,7 +212,7 @@ end
 local function getCurrentServerRows()
 	local rows = {}
 
-	for _, player in Players:GetPlayers() do
+	for _, player in ipairs(Players:GetPlayers()) do
 		table.insert(rows, {
 			Name = player.DisplayName,
 			Coins = getCoins(player),
@@ -105,7 +240,7 @@ local function createTextLabel(parent, name, text, size, position, textXAlignmen
 	local label = Instance.new("TextLabel")
 	label.Name = name
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamBold
+	label.Font = getGameFont()
 	label.Position = position
 	label.Size = size
 	label.Text = text
@@ -115,6 +250,7 @@ local function createTextLabel(parent, name, text, size, position, textXAlignmen
 	label.TextXAlignment = textXAlignment or Enum.TextXAlignment.Left
 	label.ZIndex = 5
 	label.Parent = parent
+	applyAnimatedTextGradient(label)
 
 	return label
 end
@@ -126,11 +262,11 @@ local function createRow(parent, index)
 	row.BackgroundTransparency = index % 2 == 0 and 0.18 or 0.3
 	row.BorderSizePixel = 0
 	row.LayoutOrder = index
-	row.Size = UDim2.new(1, -12, 0, 32)
+	row.Size = UDim2.new(1, -12, 0, 36)
 	row.ZIndex = 4
 	row.Parent = parent
 
-	createCorner(row, UDim.new(0, 8))
+	createCorner(row, UDim.new(0, 0))
 	createStroke(row, Color3.fromRGB(210, 220, 190), 1, 0.78)
 	createGradient(row, Color3.fromRGB(34, 36, 40), Color3.fromRGB(12, 14, 18), 0)
 
@@ -191,12 +327,17 @@ local function setupBoard()
 		surfaceGui = Instance.new("SurfaceGui")
 		surfaceGui.Name = "LeaderboardSurfaceGui"
 		surfaceGui.Face = Enum.NormalId.Front
-		surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-		surfaceGui.PixelsPerStud = 70
+		surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+		surfaceGui.CanvasSize = Vector2.new(1200, 700)
+		surfaceGui.PixelsPerStud = 75
 		surfaceGui.LightInfluence = 0
 		surfaceGui.Parent = boardPart
 	else
 		surfaceGui:ClearAllChildren()
+		surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+		surfaceGui.CanvasSize = Vector2.new(1200, 700)
+		surfaceGui.PixelsPerStud = 75
+		surfaceGui.LightInfluence = 0
 	end
 
 	rowLabels = {}
@@ -209,7 +350,7 @@ local function setupBoard()
 		backgroundImage.Position = UDim2.fromScale(0, 0)
 		backgroundImage.BackgroundTransparency = 1
 		backgroundImage.Image = leaderboardConfig.BackgroundImage
-		backgroundImage.ImageTransparency = 0.42
+		backgroundImage.ImageTransparency = 0.08
 		backgroundImage.ScaleType = Enum.ScaleType.Stretch
 		backgroundImage.ZIndex = 0
 		backgroundImage.Parent = surfaceGui
@@ -218,7 +359,7 @@ local function setupBoard()
 	local darkOverlay = Instance.new("Frame")
 	darkOverlay.Name = "DarkOverlay"
 	darkOverlay.BackgroundColor3 = Color3.fromRGB(4, 5, 7)
-	darkOverlay.BackgroundTransparency = 0.18
+	darkOverlay.BackgroundTransparency = hasCustomAssetId(leaderboardConfig.BackgroundImage) and 0.86 or 0.04
 	darkOverlay.BorderSizePixel = 0
 	darkOverlay.Size = UDim2.fromScale(1, 1)
 	darkOverlay.ZIndex = 1
@@ -228,19 +369,19 @@ local function setupBoard()
 	panel.Name = "LeaderboardPanel"
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.BackgroundColor3 = Color3.fromRGB(10, 12, 15)
-	panel.BackgroundTransparency = 0.12
+	panel.BackgroundTransparency = hasCustomAssetId(leaderboardConfig.BackgroundImage) and 0.18 or 0.08
 	panel.BorderSizePixel = 0
 	panel.Position = UDim2.fromScale(0.5, 0.5)
 	panel.Size = UDim2.fromScale(0.94, 0.92)
 	panel.ZIndex = 2
 	panel.Parent = surfaceGui
 
-	createCorner(panel, UDim.new(0, 18))
+	createCorner(panel, UDim.new(0, 0))
 	createStroke(panel, Color3.fromRGB(225, 230, 180), 3, 0.08)
 	createGradient(panel, Color3.fromRGB(28, 32, 34), Color3.fromRGB(8, 9, 12), 90)
 
 	local title = createTextLabel(panel, "Title", "ТОП 100 ИГРОКОВ", UDim2.fromScale(0.96, 0.075), UDim2.fromScale(0.02, 0.02), Enum.TextXAlignment.Center)
-	title.Font = Enum.Font.GothamBlack
+	title.Font = getGameFont()
 	title.TextColor3 = Color3.fromRGB(235, 235, 210)
 	title.TextStrokeTransparency = 0.38
 
@@ -254,7 +395,7 @@ local function setupBoard()
 	header.ZIndex = 3
 	header.Parent = panel
 
-	createCorner(header, UDim.new(0, 10))
+	createCorner(header, UDim.new(0, 0))
 	createStroke(header, Color3.fromRGB(255, 255, 255), 2, 0.24)
 	createGradient(header, Color3.fromRGB(255, 245, 165), Color3.fromRGB(150, 170, 105), 0)
 
@@ -262,16 +403,17 @@ local function setupBoard()
 	local playerHeader = createTextLabel(header, "PlayerHeader", "Игрок", UDim2.fromScale(0.56, 1), UDim2.fromScale(0.18, 0), Enum.TextXAlignment.Left)
 	local coinsHeader = createTextLabel(header, "CoinsHeader", "Coins", UDim2.fromScale(0.24, 1), UDim2.fromScale(0.74, 0), Enum.TextXAlignment.Right)
 
-	for _, label in { placeHeader, playerHeader, coinsHeader } do
+	for _, label in ipairs({ placeHeader, playerHeader, coinsHeader }) do
 		label.TextColor3 = Color3.fromRGB(18, 20, 12)
 		label.TextStrokeTransparency = 1
 	end
 
 	local list = Instance.new("ScrollingFrame")
 	list.Name = "Rows"
+	list.Active = true
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0
-	list.CanvasSize = UDim2.fromOffset(0, MAX_LEADERBOARD_ROWS * 37)
+	list.CanvasSize = UDim2.fromOffset(0, MAX_LEADERBOARD_ROWS * 42)
 	list.Position = UDim2.fromScale(0.03, 0.20)
 	list.ScrollBarImageColor3 = Color3.fromRGB(225, 230, 180)
 	list.ScrollBarThickness = 8
@@ -280,7 +422,7 @@ local function setupBoard()
 	list.Parent = panel
 
 	local layout = Instance.new("UIListLayout")
-	layout.Padding = UDim.new(0, 5)
+	layout.Padding = UDim.new(0, 6)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = list
 
@@ -360,7 +502,7 @@ function LeaderboardService.Init()
 		renderBoard()
 	end)
 
-	for _, player in Players:GetPlayers() do
+	for _, player in ipairs(Players:GetPlayers()) do
 		createLeaderstats(player)
 	end
 
