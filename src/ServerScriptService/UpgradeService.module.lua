@@ -79,7 +79,7 @@ local function getSingleBonusText(upgradeId)
 	if upgradeId == "CoinGain" then
 		return "+1"
 	elseif upgradeId == "MultiCoins" then
-		return "x+0.1"
+		return "+0.1x"
 	elseif upgradeId == "MaxSpawnCoins" then
 		return "+1 max"
 	end
@@ -95,7 +95,7 @@ local function getBulkBonusText(upgradeId, levels)
 	if upgradeId == "CoinGain" then
 		return `+{FormatNumber(levels)}`
 	elseif upgradeId == "MultiCoins" then
-		return `x+{FormatNumber(levels * 0.1)}`
+		return `+{FormatNumber(levels * 0.1)}x`
 	elseif upgradeId == "MaxSpawnCoins" then
 		return `+{FormatNumber(levels)} max`
 	end
