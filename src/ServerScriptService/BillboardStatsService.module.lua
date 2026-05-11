@@ -84,7 +84,6 @@ local function createBillboard(player)
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = BILLBOARD_NAME
 	billboard.AlwaysOnTop = true
-	billboard.BackgroundTransparency = 1
 	billboard.LightInfluence = 0
 	billboard.MaxDistance = 120
 	billboard.Size = UDim2.fromOffset(220, 44)
@@ -93,7 +92,6 @@ local function createBillboard(player)
 
 	local label = Instance.new("TextLabel")
 	label.Name = LABEL_NAME
-	label.BackgroundTransparency = 1
 	label.BorderSizePixel = 0
 	label.Font = getGameFont()
 	label.Size = UDim2.fromScale(1, 1)
