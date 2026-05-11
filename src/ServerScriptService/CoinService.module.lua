@@ -144,6 +144,7 @@ local function spawnCoin()
 	removeCoinGridDecor(coin)
 	styleCoin(coin)
 	setCoinCFrame(coin, getRandomCoinCFrame())
+	addBaseplateGridLines(coin)
 	coin.Parent = Workspace
 	activeCoins[coin] = true
 
