@@ -936,13 +936,13 @@ local function createUpgradeCard(parent, upgradeId, index)
 
 	local icon = Instance.new("ImageLabel")
 	icon.Name = "Icon"
-	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.AnchorPoint = Vector2.new(0, 0)
 	icon.BackgroundTransparency = 1
 	icon.BorderSizePixel = 0
 	icon.Image = assetConfig.IconImage or "rbxassetid://0"
-	icon.Position = UDim2.fromScale(0.5, 0.5)
-	icon.ScaleType = Enum.ScaleType.Fit
-	icon.Size = UDim2.fromOffset(76, 76)
+	icon.Position = UDim2.fromScale(0, 0)
+	icon.ScaleType = Enum.ScaleType.Crop
+	icon.Size = UDim2.fromScale(1, 1)
 	icon.ZIndex = 24
 	icon.Parent = iconBox
 
