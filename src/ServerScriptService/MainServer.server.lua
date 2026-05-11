@@ -1,15 +1,15 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local DataService = require(script.Parent.DataService)
-local UpgradeService = require(script.Parent.UpgradeService)
-local LeaderboardService = require(script.Parent.LeaderboardService)
-local CoinService = require(script.Parent.CoinService)
-
 local REMOTE_NAMES = {
 	"CoinCollectedEffect",
 	"BuyUpgrade",
 	"UpgradeResult",
 	"SyncPlayerData",
+	"CollectZoneState",
+	"AdminRequest",
+	"AdminResult",
+	"InventoryAction",
+	"SyncInventory",
 }
 
 local function getOrCreateRemotes()
@@ -23,7 +23,7 @@ local function getOrCreateRemotes()
 
 	local remotes = {}
 
-	for _, remoteName in REMOTE_NAMES do
+	for _, remoteName in ipairs(REMOTE_NAMES) do
 		local remote = remotesFolder:FindFirstChild(remoteName)
 
 		if not remote then
@@ -38,9 +38,82 @@ local function getOrCreateRemotes()
 	return remotes
 end
 
+local function safeRequire(name)
+	local moduleScript = script.Parent:FindFirstChild(name)
+
+	if not moduleScript then
+		warn(name .. " module not found")
+		return nil
+	end
+
+	local ok, result = pcall(function()
+		return require(moduleScript)
+	end)
+
+	if not ok then
+		warn(name .. " failed to require:", result)
+		return nil
+	end
+
+	return result
+end
+
+local function safeInit(name, callback)
+	local ok, err = pcall(callback)
+
+	if not ok then
+		warn(name .. " failed to init:", err)
+	end
+end
+
 local remotes = getOrCreateRemotes()
 
-DataService.Init()
-UpgradeService.Init(remotes)
-LeaderboardService.Init()
-CoinService.Init(remotes)
+local DataService = safeRequire("DataService")
+local UpgradeService = safeRequire("UpgradeService")
+local LeaderboardService = safeRequire("LeaderboardService")
+local BillboardStatsService = safeRequire("BillboardStatsService")
+local ItemService = safeRequire("ItemService")
+local CoinService = safeRequire("CoinService")
+local AdminService = safeRequire("AdminService")
+
+if DataService then
+	safeInit("DataService", function()
+		DataService.Init()
+	end)
+end
+
+if UpgradeService then
+	safeInit("UpgradeService", function()
+		UpgradeService.Init(remotes)
+	end)
+end
+
+if LeaderboardService then
+	safeInit("LeaderboardService", function()
+		LeaderboardService.Init()
+	end)
+end
+
+if BillboardStatsService then
+	safeInit("BillboardStatsService", function()
+		BillboardStatsService.Init()
+	end)
+end
+
+if ItemService then
+	safeInit("ItemService", function()
+		ItemService.Init(remotes)
+	end)
+end
+
+if CoinService then
+	safeInit("CoinService", function()
+		CoinService.Init(remotes)
+	end)
+end
+
+if AdminService then
+	safeInit("AdminService", function()
+		AdminService.Init(remotes)
+	end)
+end
