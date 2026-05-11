@@ -3,6 +3,7 @@ local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerStorage = game:GetService("ServerStorage")
+local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local DataService = require(script.Parent.DataService)
@@ -374,6 +375,7 @@ local function chaseCoinToPlayer(player, coin, amount)
 			finishCoinCollection(player, coin, amount)
 			return
 		end
+	end)
 
 		if distance > 0 then
 			local step = math.min(distance, speed * deltaTime)
