@@ -1039,6 +1039,7 @@ local function createUpgradeCard(parent, upgradeId, index)
 		Level = level,
 		Effect = effect,
 		Price = price,
+		BonusMini = bonusMini,
 		Tooltip = tooltip,
 		Buy = buyButton,
 		BuyMax = buyMaxButton,
@@ -1114,6 +1115,10 @@ local function setupUpgradeBoard()
 		surfaceGui.Parent = boardPart
 	else
 		surfaceGui:ClearAllChildren()
+		surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+		surfaceGui.CanvasSize = Vector2.new(1600, 900)
+		surfaceGui.PixelsPerStud = 80
+		surfaceGui.LightInfluence = 0
 	end
 
 	surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
@@ -1236,7 +1241,11 @@ end
 
 
 coinCollectedEffect.OnClientEvent:Connect(function(amount)
+	print("[CoinCollectedEffect handler] ClientEffects")
+	cleanupLegacyCoinPickupEffects()
 	showCoinPickupPopup(amount)
+	task.defer(cleanupLegacyCoinPickupEffects)
+	task.delay(0.15, cleanupLegacyCoinPickupEffects)
 end)
 
 upgradeResultRemote.OnClientEvent:Connect(function(result)
