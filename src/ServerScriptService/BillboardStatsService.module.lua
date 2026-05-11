@@ -86,13 +86,21 @@ local function createBillboard(player)
 	billboard.AlwaysOnTop = true
 	billboard.LightInfluence = 0
 	billboard.MaxDistance = 120
+<<<<<<< codex/fix-position-bug-in-coinvisualclient-uo2oam
 	billboard.Size = UDim2.fromOffset(190, 38)
 	billboard.StudsOffset = Vector3.new(0, 2.45, 0)
+=======
+	billboard.Size = UDim2.fromOffset(220, 44)
+	billboard.StudsOffsetWorldSpace = Vector3.new(0, 3.2, 0)
+>>>>>>> main
 	billboard.Parent = adornee
 
 	local label = Instance.new("TextLabel")
 	label.Name = LABEL_NAME
+<<<<<<< codex/fix-position-bug-in-coinvisualclient-uo2oam
 	label.BackgroundTransparency = 1
+=======
+>>>>>>> main
 	label.BorderSizePixel = 0
 	label.Font = getGameFont()
 	label.Size = UDim2.fromScale(1, 1)
@@ -101,12 +109,15 @@ local function createBillboard(player)
 	label.TextScaled = true
 	label.TextStrokeColor3 = Color3.fromRGB(35, 20, 0)
 	label.TextStrokeTransparency = 0.25
+<<<<<<< codex/fix-position-bug-in-coinvisualclient-uo2oam
 
 	local textSizeConstraint = Instance.new("UITextSizeConstraint")
 	textSizeConstraint.MinTextSize = 10
 	textSizeConstraint.MaxTextSize = 20
 	textSizeConstraint.Parent = label
 
+=======
+>>>>>>> main
 	label.Parent = billboard
 
 	applyCoinsGradient(label)
