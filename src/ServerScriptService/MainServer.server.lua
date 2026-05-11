@@ -10,6 +10,7 @@ local REMOTE_NAMES = {
 	"BuyUpgrade",
 	"UpgradeResult",
 	"SyncPlayerData",
+	"CollectZoneState",
 }
 
 local function getOrCreateRemotes()
@@ -23,7 +24,7 @@ local function getOrCreateRemotes()
 
 	local remotes = {}
 
-	for _, remoteName in REMOTE_NAMES do
+	for _, remoteName in ipairs(REMOTE_NAMES) do
 		local remote = remotesFolder:FindFirstChild(remoteName)
 
 		if not remote then
