@@ -73,6 +73,45 @@ local function setCoinCFrame(coin, cframe)
 	end
 end
 
+local function createCoinGridLine(rootPart, name, size, color)
+	local line = Instance.new("Part")
+	line.Name = name
+	line.Anchored = true
+	line.CanCollide = false
+	line.CanQuery = false
+	line.CanTouch = false
+	line.Color = color
+	line.Material = Enum.Material.Neon
+	line.Size = size
+	line.CFrame = rootPart.CFrame * CFrame.new(0, (rootPart.Size.Y / 2) + 0.015, 0)
+	line.Parent = rootPart.Parent or rootPart
+
+	local weld = Instance.new("WeldConstraint")
+	weld.Name = `{name}Weld`
+	weld.Part0 = rootPart
+	weld.Part1 = line
+	weld.Parent = line
+
+	return line
+end
+
+local function addBaseplateGridLines(coin)
+	local rootPart = getCoinRootPart(coin)
+
+	if not rootPart or rootPart:FindFirstChild("GridLineX") or (rootPart.Parent and rootPart.Parent:FindFirstChild("GridLineX")) then
+		return
+	end
+
+	local gridColor = COIN_HIGHLIGHT_FILL
+	local lineHeight = math.max(0.02, rootPart.Size.Y * 0.04)
+	local lineThickness = math.max(0.03, math.min(rootPart.Size.X, rootPart.Size.Z) * 0.05)
+	local lineLengthX = math.max(0.1, rootPart.Size.X * 0.9)
+	local lineLengthZ = math.max(0.1, rootPart.Size.Z * 0.9)
+
+	createCoinGridLine(rootPart, "GridLineX", Vector3.new(lineLengthX, lineHeight, lineThickness), gridColor)
+	createCoinGridLine(rootPart, "GridLineZ", Vector3.new(lineThickness, lineHeight, lineLengthZ), gridColor)
+end
+
 local function getRandomCoinCFrame()
 	local halfSize = zonePart.Size * 0.5
 	local x = random:NextNumber(-halfSize.X, halfSize.X)
@@ -135,6 +174,7 @@ local function spawnCoin()
 	coin.Name = "Coin"
 	styleCoin(coin)
 	setCoinCFrame(coin, getRandomCoinCFrame())
+	addBaseplateGridLines(coin)
 	coin.Parent = Workspace
 	activeCoins[coin] = true
 

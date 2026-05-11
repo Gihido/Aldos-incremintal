@@ -24,9 +24,9 @@ local NOTIFICATION_CONFIG = {
 }
 
 local UPGRADE_ORDER = { "CoinGain", "MultiCoins", "MaxSpawnCoins" }
-local CARD_WIDTH = 430
-local CARD_HEIGHT = 690
-local CARD_PADDING = 24
+local CARD_WIDTH = 390
+local CARD_HEIGHT = 610
+local CARD_PADDING = 20
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -250,7 +250,7 @@ local function showCoinPickupPopup(amount)
 		backgroundImage.Name = "PopupBackgroundImage"
 		backgroundImage.BackgroundTransparency = 1
 		backgroundImage.Image = coinPopupConfig.BackgroundImage
-		backgroundImage.ImageTransparency = 0.2
+		backgroundImage.ImageTransparency = 0.08
 		backgroundImage.Position = UDim2.fromScale(0, 0)
 		backgroundImage.ScaleType = Enum.ScaleType.Stretch
 		backgroundImage.Size = UDim2.fromScale(1, 1)
@@ -260,7 +260,7 @@ local function showCoinPickupPopup(amount)
 		darkOverlay = Instance.new("Frame")
 		darkOverlay.Name = "PopupDarkOverlay"
 		darkOverlay.BackgroundColor3 = Color3.fromRGB(24, 24, 26)
-		darkOverlay.BackgroundTransparency = 0.72
+		darkOverlay.BackgroundTransparency = 0.88
 		darkOverlay.BorderSizePixel = 0
 		darkOverlay.Size = UDim2.fromScale(1, 1)
 		darkOverlay.ZIndex = 81
@@ -380,8 +380,7 @@ local function showNotification(notificationType, message)
 
 	local label = Instance.new("TextLabel")
 	label.Name = "Message"
-	label.BackgroundColor3 = Color3.fromRGB(12, 14, 13)
-	label.BackgroundTransparency = 0.12
+	label.BackgroundTransparency = 1
 	label.BorderSizePixel = 0
 	label.Font = Enum.Font.GothamBold
 	label.Position = UDim2.fromOffset(60, 7)
@@ -501,14 +500,11 @@ local function showTooltip(button, tooltip, text)
 		label.Text = text
 	end
 
+	local tooltipX = button.Name == "BuyMax" and 220 or 36
+
 	tooltip.Visible = true
-	tooltip.Position = UDim2.new(
-		button.Position.X.Scale,
-		button.Position.X.Offset,
-		button.Position.Y.Scale - 0.17,
-		button.Position.Y.Offset
-	)
-	tooltip.Size = UDim2.fromOffset(176, 42)
+	tooltip.Position = UDim2.fromOffset(tooltipX, 445)
+	tooltip.Size = UDim2.fromOffset(130, 38)
 	tooltip.ZIndex = 80
 end
 
@@ -539,7 +535,8 @@ local function styleButton(button, colorA, colorB, strokeColor, textColor, backg
 	label.Size = UDim2.fromScale(1, 1)
 	label.Text = button.Name == "BuyMax" and "Buy Max" or "Buy"
 	label.TextColor3 = textColor
-	label.TextScaled = true
+	label.TextScaled = false
+	label.TextSize = button.Name == "BuyMax" and 28 or 32
 	label.TextStrokeTransparency = 0.72
 	label.ZIndex = button.ZIndex + 5
 	label.Parent = button
@@ -707,8 +704,8 @@ local function createTooltip(parent)
 	local tooltip = createTextBox(
 		parent,
 		"Tooltip",
-		UDim2.fromOffset(36, 476),
-		UDim2.fromOffset(140, 42),
+		UDim2.fromOffset(220, 445),
+		UDim2.fromOffset(130, 38),
 		Color3.fromRGB(48, 54, 48),
 		(UIAssetConfig.Tooltip or {}).BackgroundImage,
 		80
@@ -763,8 +760,8 @@ local function createUpgradeCard(parent, upgradeId, index)
 	iconBox.BackgroundTransparency = 0.08
 	iconBox.BorderSizePixel = 0
 	iconBox.ClipsDescendants = true
-	iconBox.Position = UDim2.fromOffset(36, 72)
-	iconBox.Size = UDim2.fromOffset(120, 120)
+	iconBox.Position = UDim2.fromOffset(30, 54)
+	iconBox.Size = UDim2.fromOffset(105, 105)
 	iconBox.ZIndex = 18
 	iconBox.Parent = card
 	addStroke(iconBox, Color3.fromRGB(232, 248, 205), 2, 0.12)
@@ -777,45 +774,41 @@ local function createUpgradeCard(parent, upgradeId, index)
 	icon.Image = assetConfig.IconImage or "rbxassetid://0"
 	icon.Position = UDim2.fromScale(0.5, 0.5)
 	icon.ScaleType = Enum.ScaleType.Fit
-	icon.Size = UDim2.fromOffset(84, 84)
+	icon.Size = UDim2.fromOffset(76, 76)
 	icon.ZIndex = 24
 	icon.Parent = iconBox
 
-	local title = createText(card, "Title", upgradeId, UDim2.fromOffset(175, 82), UDim2.fromOffset(210, 44), Enum.Font.GothamBold, Color3.fromRGB(245, 248, 230))
+	local title = createText(card, "Title", upgradeId, UDim2.fromOffset(150, 62), UDim2.fromOffset(205, 40), Enum.Font.GothamBold, Color3.fromRGB(245, 248, 230))
 	title.TextStrokeTransparency = 0.7
 	title.TextYAlignment = Enum.TextYAlignment.Center
 	title.ZIndex = 26
 
-	local level = createText(card, "Level", "0/0", UDim2.fromOffset(175, 132), UDim2.fromOffset(160, 42), Enum.Font.GothamBold, Color3.fromRGB(196, 212, 190))
+	local level = createText(card, "Level", "0/0", UDim2.fromOffset(150, 108), UDim2.fromOffset(150, 36), Enum.Font.GothamBold, Color3.fromRGB(196, 212, 190))
 	level.TextStrokeTransparency = 0.78
 	level.TextYAlignment = Enum.TextYAlignment.Center
 	level.ZIndex = 26
 
-	local valueBox = createTextBox(card, "ValueBox", UDim2.fromOffset(36, 225), UDim2.fromOffset(358, 135), Color3.fromRGB(38, 43, 39), assetConfig.ValueBoxBackground, 18)
+	local valueBox = createTextBox(card, "ValueBox", UDim2.fromOffset(34, 180), UDim2.fromOffset(322, 110), Color3.fromRGB(38, 43, 39), assetConfig.ValueBoxBackground, 18)
 	local effect = createBoxLabel(valueBox, "Effect", "+1", Enum.Font.GothamBold, Color3.fromRGB(250, 255, 232))
 	effect.TextStrokeTransparency = 0.46
 
-	local priceBox = createTextBox(card, "PriceBox", UDim2.fromOffset(36, 390), UDim2.fromOffset(358, 78), Color3.fromRGB(44, 39, 31), assetConfig.PriceBoxBackground, 18)
+	local priceBox = createTextBox(card, "PriceBox", UDim2.fromOffset(34, 318), UDim2.fromOffset(322, 64), Color3.fromRGB(44, 39, 31), assetConfig.PriceBoxBackground, 18)
 	local price = createBoxLabel(priceBox, "Price", "Price : 0 Coins", Enum.Font.GothamBold, Color3.fromRGB(255, 235, 150))
 	price.TextStrokeTransparency = 0.58
-
-	local bonusMiniBox = createTextBox(card, "BonusMiniBox", UDim2.fromOffset(248, 476), UDim2.fromOffset(140, 42), Color3.fromRGB(42, 52, 40), assetConfig.BonusMiniBoxBackground, 18)
-	local bonusMini = createBoxLabel(bonusMiniBox, "BonusMini", "+1", Enum.Font.GothamBold, Color3.fromRGB(238, 255, 205))
-	bonusMini.TextStrokeTransparency = 0.58
 
 	local tooltip = createTooltip(card)
 
 	local buyButton = Instance.new("TextButton")
 	buyButton.Name = "Buy"
-	buyButton.Position = UDim2.fromOffset(36, 525)
-	buyButton.Size = UDim2.fromOffset(136, 100)
+	buyButton.Position = UDim2.fromOffset(34, 500)
+	buyButton.Size = UDim2.fromOffset(130, 82)
 	buyButton.Parent = card
 	styleButton(buyButton, Color3.fromRGB(176, 226, 118), Color3.fromRGB(62, 142, 62), Color3.fromRGB(232, 255, 198), Color3.fromRGB(12, 28, 10), assetConfig.BuyButtonBackground)
 
 	local buyMaxButton = Instance.new("TextButton")
 	buyMaxButton.Name = "BuyMax"
-	buyMaxButton.Position = UDim2.fromOffset(230, 525)
-	buyMaxButton.Size = UDim2.fromOffset(164, 100)
+	buyMaxButton.Position = UDim2.fromOffset(206, 500)
+	buyMaxButton.Size = UDim2.fromOffset(150, 82)
 	buyMaxButton.Parent = card
 	styleButton(buyMaxButton, Color3.fromRGB(242, 210, 132), Color3.fromRGB(128, 112, 82), Color3.fromRGB(255, 244, 205), Color3.fromRGB(255, 255, 245), assetConfig.BuyMaxButtonBackground)
 
@@ -908,7 +901,7 @@ local function setupUpgradeBoard()
 	end
 
 	surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
-	surfaceGui.CanvasSize = Vector2.new(1500, 880)
+	surfaceGui.CanvasSize = Vector2.new(1400, 760)
 	surfaceGui.PixelsPerStud = 90
 	surfaceGui.LightInfluence = 0
 
@@ -935,12 +928,12 @@ local function setupUpgradeBoard()
 	cardsScroll.BorderSizePixel = 0
 	cardsScroll.CanvasSize = UDim2.fromOffset((#UPGRADE_ORDER * CARD_WIDTH) + ((#UPGRADE_ORDER - 1) * CARD_PADDING) + 52, 0)
 	cardsScroll.ClipsDescendants = true
-	cardsScroll.Position = UDim2.fromOffset(36, 110)
+	cardsScroll.Position = UDim2.fromOffset(36, 90)
 	cardsScroll.ScrollingDirection = Enum.ScrollingDirection.X
 	cardsScroll.ScrollBarImageColor3 = Color3.fromRGB(210, 240, 170)
 	cardsScroll.ScrollBarImageTransparency = 0.15
 	cardsScroll.ScrollBarThickness = 10
-	cardsScroll.Size = UDim2.new(1, -72, 0, 740)
+	cardsScroll.Size = UDim2.new(1, -72, 0, 650)
 	cardsScroll.VerticalScrollBarInset = Enum.ScrollBarInset.None
 	cardsScroll.ZIndex = 5
 	cardsScroll.Parent = background
@@ -950,7 +943,7 @@ local function setupUpgradeBoard()
 	cardsContainer.Name = "CardsContainer"
 	cardsContainer.BackgroundTransparency = 1
 	cardsContainer.BorderSizePixel = 0
-	cardsContainer.Position = UDim2.fromOffset(26, 20)
+	cardsContainer.Position = UDim2.fromOffset(24, 18)
 	cardsContainer.Size = UDim2.fromOffset((#UPGRADE_ORDER * CARD_WIDTH) + ((#UPGRADE_ORDER - 1) * CARD_PADDING), CARD_HEIGHT)
 	cardsContainer.ZIndex = 6
 	cardsContainer.Parent = cardsScroll
