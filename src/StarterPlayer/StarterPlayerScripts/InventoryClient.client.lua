@@ -18,6 +18,11 @@ local INVENTORY_ITEMS = ItemConfig.Order
 local FALLBACK_BACKGROUND = Color3.fromRGB(22, 28, 36)
 local FALLBACK_STROKE = Color3.fromRGB(210, 220, 235)
 local SELECTED_STROKE = Color3.fromRGB(255, 245, 120)
+local HOVER_STROKE = Color3.fromRGB(140, 230, 255)
+local PRESS_STROKE = Color3.fromRGB(255, 255, 180)
+local TWEEN_FAST = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local TWEEN_PANEL_OPEN = TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+local TWEEN_PANEL_CLOSE = TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
 local playerGui = player:WaitForChild("PlayerGui")
 local gui = playerGui:WaitForChild("InventoryGui", 10)
@@ -36,6 +41,8 @@ local selectedItemId
 local selectedSlot
 local currentTab = "Items"
 local buffRows = {}
+local slotHoverStates = {}
+local baseLayout = {}
 local ui = {}
 
 local function hasCustomAssetId(assetId)
@@ -132,8 +139,90 @@ local function setImageOrFallback(imageObject, assetId, fallbackColor)
 end
 
 local function setText(label, text)
-	if label and label:IsA("TextLabel") then
+	if label and (label:IsA("TextLabel") or label:IsA("TextButton") or label:IsA("TextBox")) then
 		label.Text = text
+	end
+end
+
+local function getGameFont()
+	return (UIAssetConfig.Fonts and UIAssetConfig.Fonts.Main) or Enum.Font.Arcade
+end
+
+local function applyTextConstraint(textObject, minSize, maxSize)
+	if not textObject or not (textObject:IsA("TextLabel") or textObject:IsA("TextButton") or textObject:IsA("TextBox")) then
+		return
+	end
+
+	textObject.Font = getGameFont()
+	textObject.TextScaled = true
+	textObject.TextStrokeTransparency = math.min(textObject.TextStrokeTransparency, 0.22)
+	textObject.TextWrapped = true
+
+	local constraint = textObject:FindFirstChildOfClass("UITextSizeConstraint")
+
+	if not constraint then
+		constraint = Instance.new("UITextSizeConstraint")
+		constraint.Parent = textObject
+	end
+
+	constraint.MinTextSize = minSize
+	constraint.MaxTextSize = maxSize
+end
+
+local TEXT_SIZE_RULES = {
+	InventoryTitle = { 22, 48 },
+	ItemName = { 14, 30 },
+	ItemCount = { 14, 30 },
+	InfoName = { 22, 44 },
+	InfoCount = { 16, 34 },
+	InfoBoost = { 16, 34 },
+	InfoDescription = { 14, 30 },
+	ButtonText = { 16, 34 },
+	TooltipName = { 18, 36 },
+	TooltipBoost = { 15, 30 },
+	BuffTime = { 14, 28 },
+}
+
+local function applyInventoryTextStyles(root)
+	if not root then
+		return
+	end
+
+	for _, descendant in ipairs(root:GetDescendants()) do
+		local rule = TEXT_SIZE_RULES[descendant.Name]
+
+		if rule then
+			applyTextConstraint(descendant, rule[1], rule[2])
+		elseif ui.ActiveBuffsPanel and descendant:IsDescendantOf(ui.ActiveBuffsPanel) and (descendant:IsA("TextLabel") or descendant:IsA("TextButton") or descendant:IsA("TextBox")) then
+			applyTextConstraint(descendant, 14, 28)
+		end
+	end
+end
+
+local function ensureScale(guiObject, name)
+	if not guiObject or not guiObject:IsA("GuiObject") then
+		return nil
+	end
+
+	local scale = guiObject:FindFirstChild(name or "HoverScale")
+
+	if not scale then
+		scale = Instance.new("UIScale")
+		scale.Name = name or "HoverScale"
+		scale.Scale = 1
+		scale.Parent = guiObject
+	end
+
+	return scale
+end
+
+local function tweenScale(guiObject, scaleValue)
+	local scale = ensureScale(guiObject)
+
+	if scale then
+		TweenService:Create(scale, TWEEN_FAST, {
+			Scale = scaleValue,
+		}):Play()
 	end
 end
 
@@ -208,10 +297,12 @@ local function cacheGui()
 	ui.InventoryScale = findChild(ui.InventoryMain, "InventoryScale")
 	ui.InventoryBackground = findChild(ui.InventoryMain, "InventoryBackground")
 	ui.CloseInventoryButton = findChild(ui.InventoryMain, "CloseInventoryButton")
+	ui.InventoryTitle = findChild(ui.InventoryMain, "InventoryTitle")
+	ui.InventoryContent = findChild(ui.InventoryMain, "InventoryContent")
 	ui.ItemsTabButton = getNested(ui.InventoryMain, { "CategoryPanel", "ItemsTabButton" })
 	ui.PassivesTabButton = getNested(ui.InventoryMain, { "CategoryPanel", "PassivesTabButton" })
-	ui.ItemsScroll = getNested(ui.InventoryMain, { "InventoryContent", "ItemsScroll" })
-	ui.PassivesScroll = getNested(ui.InventoryMain, { "InventoryContent", "PassivesScroll" })
+	ui.ItemsScroll = getNested(ui.InventoryContent, { "ItemsScroll" })
+	ui.PassivesScroll = getNested(ui.InventoryContent, { "PassivesScroll" })
 	ui.ItemInfoPanel = findChild(ui.InventoryMain, "ItemInfoPanel")
 	ui.CloseInfoButton = findChild(ui.ItemInfoPanel, "CloseInfoButton")
 	ui.InfoBackground = findChild(ui.ItemInfoPanel, "InfoBackground")
@@ -266,45 +357,149 @@ local function updateResponsiveScale()
 	end
 end
 
+local getInfoHiddenPosition
+
+local function captureBaseLayout()
+	if ui.ItemInfoPanel and not baseLayout.InfoOpenPosition then
+		baseLayout.InfoOpenPosition = ui.ItemInfoPanel.Position
+		baseLayout.InfoOpenSize = ui.ItemInfoPanel.Size
+		ui.ItemInfoPanel.Position = getInfoHiddenPosition()
+		ui.ItemInfoPanel.Visible = false
+	end
+
+	if ui.InventoryContent and not baseLayout.ContentDefaultPosition then
+		baseLayout.ContentDefaultPosition = ui.InventoryContent.Position
+		baseLayout.ContentDefaultSize = ui.InventoryContent.Size
+	end
+end
+
+getInfoHiddenPosition = function()
+	local openPosition = baseLayout.InfoOpenPosition or (ui.ItemInfoPanel and ui.ItemInfoPanel.Position) or UDim2.fromScale(1, 0)
+	local panelWidth = ui.ItemInfoPanel and ui.ItemInfoPanel.AbsoluteSize.X or 0
+
+	return UDim2.new(
+		openPosition.X.Scale,
+		openPosition.X.Offset + panelWidth + 40,
+		openPosition.Y.Scale,
+		openPosition.Y.Offset
+	)
+end
+
+local function getCompressedContentLayout()
+	if not ui.InventoryContent then
+		return nil, nil
+	end
+
+	local defaultPosition = baseLayout.ContentDefaultPosition or ui.InventoryContent.Position
+	local defaultSize = baseLayout.ContentDefaultSize or ui.InventoryContent.Size
+	local panelWidth = ui.ItemInfoPanel and ui.ItemInfoPanel.AbsoluteSize.X or 0
+	local gap = 20
+	local compression = panelWidth + gap
+	local minWidth = 280
+	local currentWidth = ui.InventoryContent.AbsoluteSize.X
+	if baseLayout.ContentDefaultSize then
+		currentWidth += (baseLayout.ContentDefaultSize.X.Offset - ui.InventoryContent.Size.X.Offset)
+	end
+	local allowedCompression = math.max(0, math.min(compression, math.max(0, currentWidth - minWidth)))
+	local shift = math.min(20, allowedCompression * 0.25)
+
+	return UDim2.new(
+		defaultPosition.X.Scale,
+		defaultPosition.X.Offset - shift,
+		defaultPosition.Y.Scale,
+		defaultPosition.Y.Offset
+	), UDim2.new(
+		defaultSize.X.Scale,
+		defaultSize.X.Offset - allowedCompression,
+		defaultSize.Y.Scale,
+		defaultSize.Y.Offset
+	)
+end
+
+local function tweenInventoryContent(compressed)
+	if not ui.InventoryContent then
+		return
+	end
+
+	local targetPosition
+	local targetSize
+
+	if compressed then
+		targetPosition, targetSize = getCompressedContentLayout()
+	else
+		targetPosition = baseLayout.ContentDefaultPosition or ui.InventoryContent.Position
+		targetSize = baseLayout.ContentDefaultSize or ui.InventoryContent.Size
+	end
+
+	if targetPosition and targetSize then
+		TweenService:Create(ui.InventoryContent, TWEEN_PANEL_OPEN, {
+			Position = targetPosition,
+			Size = targetSize,
+		}):Play()
+	end
+end
+
 local function setSlotSelected(slot, selected)
-	local stroke = ensureStroke(slot, "SelectedStroke", selected and SELECTED_STROKE or FALLBACK_STROKE, selected and 3 or 1, selected and 0 or 0.8)
+	local hovered = slot and slotHoverStates[slot]
+	local color = selected and SELECTED_STROKE or (hovered and HOVER_STROKE or FALLBACK_STROKE)
+	local thickness = selected and 3 or (hovered and 2 or 1)
+	local transparency = selected and 0 or (hovered and 0.08 or 0.8)
+	local stroke = ensureStroke(slot, "SelectedStroke", color, thickness, transparency)
 
 	if stroke then
 		stroke.Enabled = true
 	end
 end
 
-local function updateSlot(itemId)
+local closeItemInfo
+
+local function updateSlot(itemId, visibleIndex)
 	local slot = ui.ItemsScroll and ui.ItemsScroll:FindFirstChild(`Item_{itemId}`)
 	local definition = ItemConfig[itemId]
 
 	if not slot or not definition then
-		return
+		return visibleIndex
 	end
 
 	local count = getItemCount(itemId)
+
+	if count <= 0 then
+		slot.Visible = false
+		slotHoverStates[slot] = nil
+		if selectedItemId == itemId then
+			closeItemInfo()
+		end
+		return visibleIndex
+	end
+
 	local slotBackground = slot:FindFirstChild("SlotBackground")
 	local itemIcon = slot:FindFirstChild("ItemIcon")
 	local itemName = slot:FindFirstChild("ItemName")
 	local itemCount = slot:FindFirstChild("ItemCount")
 
+	slot.Visible = true
+	slot.LayoutOrder = visibleIndex
 	setImageOrFallback(slotBackground, getSlotBackground(itemId), Color3.fromRGB(28, 36, 48))
 	setImageOrFallback(itemIcon, getItemIcon(itemId, false), Color3.fromRGB(40, 48, 56))
 	setIconFallbackLetter(itemIcon, itemId)
 	setText(itemName, definition.DisplayName)
 	setText(itemCount, `x{count}`)
 	slot.ImageTransparency = 1
-	slot.BackgroundTransparency = count > 0 and 1 or 0.55
+	slot.BackgroundTransparency = 1
 	setSlotSelected(slot, selectedItemId == itemId)
+
+	return visibleIndex + 1
 end
 
 local function updateAllSlots()
+	local visibleIndex = 1
+
 	for _, itemId in ipairs(INVENTORY_ITEMS) do
-		updateSlot(itemId)
+		visibleIndex = updateSlot(itemId, visibleIndex)
 	end
 end
 
-local function closeItemInfo()
+closeItemInfo = function()
 	selectedItemId = nil
 
 	if selectedSlot then
@@ -313,10 +508,10 @@ local function closeItemInfo()
 	end
 
 	if ui.ItemInfoPanel then
-		local hiddenPosition = UDim2.new(1, 320, 0, 90)
-		TweenService:Create(ui.ItemInfoPanel, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-			Position = hiddenPosition,
+		TweenService:Create(ui.ItemInfoPanel, TWEEN_PANEL_CLOSE, {
+			Position = getInfoHiddenPosition(),
 		}):Play()
+		tweenInventoryContent(false)
 		task.delay(0.17, function()
 			if not selectedItemId and ui.ItemInfoPanel then
 				ui.ItemInfoPanel.Visible = false
@@ -370,10 +565,11 @@ local function openItemInfo(itemId)
 
 	if ui.ItemInfoPanel then
 		ui.ItemInfoPanel.Visible = true
-		ui.ItemInfoPanel.Position = UDim2.new(1, 320, 0, 90)
+		ui.ItemInfoPanel.Position = getInfoHiddenPosition()
 		refreshItemInfo()
-		TweenService:Create(ui.ItemInfoPanel, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-			Position = UDim2.new(1, -24, 0, 90),
+		tweenInventoryContent(true)
+		TweenService:Create(ui.ItemInfoPanel, TWEEN_PANEL_OPEN, {
+			Position = baseLayout.InfoOpenPosition or ui.ItemInfoPanel.Position,
 		}):Play()
 	end
 
@@ -410,6 +606,9 @@ local function showTab(tabName)
 		if ui.PassivesScroll then
 			ui.PassivesScroll.Visible = tabName == "Passives"
 		end
+
+		setSlotSelected(ui.ItemsTabButton, tabName == "Items")
+		setSlotSelected(ui.PassivesTabButton, tabName == "Passives")
 	end
 
 	if tabName == "Passives" and ui.ItemInfoPanel and ui.ItemInfoPanel.Visible then
@@ -550,7 +749,23 @@ local function updateActiveBuffs(data)
 
 			if timeLabel and timeLabel:IsA("TextLabel") then
 				timeLabel.Text = formatRemaining(buff.Remaining or ((buff.EndTime or os.time()) - os.time()))
+				applyTextConstraint(timeLabel, 14, 28)
 			end
+
+			local multiplierLabel = row:FindFirstChild("BuffMultiplier")
+			if not multiplierLabel then
+				multiplierLabel = Instance.new("TextLabel")
+				multiplierLabel.Name = "BuffMultiplier"
+				multiplierLabel.BackgroundTransparency = 1
+				multiplierLabel.Position = UDim2.new(0, 0, 0, 0)
+				multiplierLabel.Size = UDim2.new(1, 0, 0, 20)
+				multiplierLabel.ZIndex = row.ZIndex + 2
+				multiplierLabel.Parent = row
+			end
+
+			multiplierLabel.Text = `x{string.format("%.2f", buff.CoinMultiplier or definition.CoinMultiplier or 1)}`
+			multiplierLabel.TextColor3 = Color3.fromRGB(255, 245, 170)
+			applyTextConstraint(multiplierLabel, 12, 24)
 
 			buffRows[buff.Uid] = row
 		end
@@ -579,29 +794,93 @@ local function hookItemSlots()
 		local slot = ui.ItemsScroll:FindFirstChild(`Item_{itemId}`)
 
 		if slot and slot:IsA("GuiButton") then
+			ensureScale(slot)
 			slot.MouseButton1Click:Connect(function()
-				openItemInfo(itemId)
+				if getItemCount(itemId) > 0 then
+					openItemInfo(itemId)
+				end
 			end)
 
 			slot.MouseEnter:Connect(function()
+				if getItemCount(itemId) <= 0 then
+					return
+				end
+				slotHoverStates[slot] = true
+				setSlotSelected(slot, selectedItemId == itemId)
+				tweenScale(slot, 1.06)
 				local mousePosition = UserInputService:GetMouseLocation()
 				showTooltip(itemId, UDim2.fromOffset(mousePosition.X + 16, mousePosition.Y + 12))
 			end)
 
-			slot.MouseLeave:Connect(hideTooltip)
+			slot.MouseLeave:Connect(function()
+				slotHoverStates[slot] = false
+				setSlotSelected(slot, selectedItemId == itemId)
+				tweenScale(slot, 1)
+				hideTooltip()
+			end)
 			slot.MouseButton1Down:Connect(function(x, y)
+				if getItemCount(itemId) <= 0 then
+					return
+				end
+				tweenScale(slot, 0.96)
+				local stroke = ensureStroke(slot, "SelectedStroke", PRESS_STROKE, 3, 0.02)
+				if stroke then
+					stroke.Enabled = true
+				end
 				if ResponsiveUI.IsMobileLike() then
 					showTooltip(itemId, UDim2.fromOffset(x + 12, y + 12))
 				end
 			end)
-			slot.MouseButton1Up:Connect(hideTooltip)
+			slot.MouseButton1Up:Connect(function()
+				tweenScale(slot, slotHoverStates[slot] and 1.06 or 1)
+				setSlotSelected(slot, selectedItemId == itemId)
+				if ResponsiveUI.IsMobileLike() then
+					hideTooltip()
+				end
+			end)
 		else
 			warnMissing(`ItemsScroll.Item_{itemId}`)
 		end
 	end
 end
 
+local function hookButtonEffects(button, hoverScale, pressScale)
+	if not button or not button:IsA("GuiButton") then
+		return
+	end
+
+	ensureScale(button)
+	button.MouseEnter:Connect(function()
+		tweenScale(button, hoverScale or 1.05)
+		local stroke = ensureStroke(button, "HoverStroke", HOVER_STROKE, 2, 0.12)
+		if stroke then
+			stroke.Enabled = true
+		end
+	end)
+	button.MouseLeave:Connect(function()
+		tweenScale(button, 1)
+		local stroke = button:FindFirstChild("HoverStroke")
+		if stroke then
+			stroke.Enabled = false
+		end
+	end)
+	button.MouseButton1Down:Connect(function()
+		tweenScale(button, pressScale or 0.96)
+	end)
+	button.MouseButton1Up:Connect(function()
+		tweenScale(button, hoverScale or 1.05)
+	end)
+end
+
 local function hookButtons()
+	hookButtonEffects(ui.ToggleButton, 1.06, 0.94)
+	hookButtonEffects(ui.CloseInventoryButton, 1.06, 0.94)
+	hookButtonEffects(ui.ItemsTabButton, 1.04, 0.96)
+	hookButtonEffects(ui.PassivesTabButton, 1.04, 0.96)
+	hookButtonEffects(ui.CloseInfoButton, 1.06, 0.94)
+	hookButtonEffects(ui.ActivateButton, 1.05, 0.95)
+	hookButtonEffects(ui.DeleteButton, 1.05, 0.95)
+
 	if ui.ToggleButton and ui.ToggleButton:IsA("GuiButton") then
 		ui.ToggleButton.MouseButton1Click:Connect(toggleInventory)
 	end
@@ -659,6 +938,9 @@ local function setupPassivesPlaceholder()
 end
 
 cacheGui()
+task.wait()
+captureBaseLayout()
+applyInventoryTextStyles(gui)
 applyInventoryAssets()
 updateResponsiveScale()
 hookButtons()

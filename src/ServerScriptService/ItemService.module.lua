@@ -126,6 +126,41 @@ function ItemService.ActivateItem(player, itemId)
 	return true, "Activated"
 end
 
+
+function ItemService.AddItem(player, itemId, amount)
+	local itemDefinition = getItemDefinition(itemId)
+
+	if not player then
+		return false, "Player not found"
+	end
+
+	if not itemDefinition then
+		if player then
+			ItemService.SyncPlayer(player, "Error", "Unknown item")
+		end
+		return false, "Unknown item"
+	end
+
+	local safeAmount = math.floor(tonumber(amount) or 0)
+
+	if safeAmount <= 0 then
+		ItemService.SyncPlayer(player, "Error", "Amount must be positive")
+		return false, "Amount must be positive"
+	end
+
+	safeAmount = math.min(safeAmount, 999)
+	local newCount = DataService.AddItem(player, itemId, safeAmount)
+	ItemService.SyncPlayer(player, "Success", `Added {safeAmount} {itemDefinition.DisplayName}`)
+
+	if type(DataService.SavePlayer) == "function" then
+		task.defer(function()
+			DataService.SavePlayer(player)
+		end)
+	end
+
+	return true, `Added {safeAmount} {itemDefinition.DisplayName}`, newCount
+end
+
 function ItemService.DeleteItem(player, itemId, amount)
 	local itemDefinition = getItemDefinition(itemId)
 

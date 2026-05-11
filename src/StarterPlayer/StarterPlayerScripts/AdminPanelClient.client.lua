@@ -5,17 +5,18 @@ local Workspace = game:GetService("Workspace")
 local shared = ReplicatedStorage:WaitForChild("Shared")
 local ResponsiveUI = require(shared:WaitForChild("ResponsiveUI"))
 local UIAssetConfig = require(shared:WaitForChild("UIAssetConfig"))
+local ItemConfig = require(shared:WaitForChild("ItemConfig"))
 
 local ADMIN_NAME = "Doter24_7"
 local UI_PROFILES = {
 	Desktop = {
-		PanelSize = Vector2.new(310, 360),
+		PanelSize = Vector2.new(310, 500),
 		PanelScale = 1,
 		Position = UDim2.fromScale(0.98, 0.58),
 		OpenButtonSize = UDim2.fromOffset(78, 34),
 	},
 	Mobile = {
-		PanelSize = Vector2.new(260, 310),
+		PanelSize = Vector2.new(310, 500),
 		PanelScale = 0.75,
 		Position = UDim2.fromScale(0.98, 0.58),
 		OpenButtonSize = UDim2.fromOffset(70, 32),
@@ -38,12 +39,16 @@ local adminRequestRemote = remotes:WaitForChild("AdminRequest")
 local adminResultRemote = remotes:WaitForChild("AdminResult")
 
 local selectedUserId
+local selectedItemId = ItemConfig.Order[1]
 local selectedButton
+local selectedItemButton
 local playerButtons = {}
+local itemButtons = {}
 local panel
 local openButton
 local statusLabel
 local amountBox
+local itemAmountBox
 local scaleObject
 
 local function getGameFont()
@@ -161,6 +166,19 @@ local function selectPlayer(player, button)
 	selectedButton = button
 	selectedButton.BackgroundColor3 = Color3.fromRGB(255, 245, 105)
 	setStatus(`Selected: {player.Name}`, true)
+end
+
+local function selectItem(itemId, button)
+	selectedItemId = itemId
+
+	if selectedItemButton then
+		selectedItemButton.BackgroundColor3 = BUTTON_COLOR_TOP
+	end
+
+	selectedItemButton = button
+	if selectedItemButton then
+		selectedItemButton.BackgroundColor3 = Color3.fromRGB(255, 245, 105)
+	end
 end
 
 local function refreshPlayerList(listFrame)
@@ -288,7 +306,73 @@ local function createAdminPanel()
 		})
 	end)
 
-	statusLabel = createTextLabel(panel, "Status", "Ready", UDim2.fromOffset(14, 314), UDim2.new(1, -28, 0, 34), 14)
+	createTextLabel(panel, "ItemsTitle", "Give Item", UDim2.fromOffset(14, 312), UDim2.new(1, -28, 0, 22), 16)
+
+	for index, itemId in ipairs(ItemConfig.Order) do
+		local definition = ItemConfig[itemId]
+		local column = (index - 1) % 2
+		local row = math.floor((index - 1) / 2)
+		local itemButton = createButton(
+			panel,
+			`Item_{itemId}`,
+			definition and definition.DisplayName or itemId,
+			UDim2.new(column * 0.5, 14 + column * 4, 0, 340 + row * 34),
+			UDim2.new(0.5, -20, 0, 30)
+		)
+		itemButton.TextSize = 14
+		itemButton.MouseButton1Click:Connect(function()
+			selectItem(itemId, itemButton)
+		end)
+		itemButtons[itemId] = itemButton
+
+		if itemId == selectedItemId then
+			selectItem(itemId, itemButton)
+		end
+	end
+
+	itemAmountBox = Instance.new("TextBox")
+	itemAmountBox.Name = "ItemAmountBox"
+	itemAmountBox.BackgroundColor3 = Color3.fromRGB(10, 40, 105)
+	itemAmountBox.BackgroundTransparency = 0.08
+	itemAmountBox.BorderSizePixel = 0
+	itemAmountBox.ClearTextOnFocus = false
+	itemAmountBox.PlaceholderText = "Item amount"
+	itemAmountBox.Position = UDim2.fromOffset(14, 412)
+	itemAmountBox.Size = UDim2.new(0.48, -18, 0, 36)
+	itemAmountBox.Text = "1"
+	itemAmountBox.ZIndex = panel.ZIndex + 2
+	itemAmountBox.Parent = panel
+	styleText(itemAmountBox, 16)
+	addStroke(itemAmountBox, Color3.fromRGB(190, 235, 255), 2, 0.12)
+
+	itemAmountBox:GetPropertyChangedSignal("Text"):Connect(function()
+		local filtered = itemAmountBox.Text:gsub("%D", "")
+		if filtered ~= itemAmountBox.Text then
+			itemAmountBox.Text = filtered
+		end
+	end)
+
+	local addItemButton = createButton(panel, "AddItem", "Add Item", UDim2.new(0.52, 4, 0, 412), UDim2.new(0.48, -18, 0, 36))
+	addItemButton.MouseButton1Click:Connect(function()
+		if not selectedUserId then
+			setStatus("Select player", false)
+			return
+		end
+
+		if not selectedItemId then
+			setStatus("Select item", false)
+			return
+		end
+
+		adminRequestRemote:FireServer({
+			Action = "AddItem",
+			TargetUserId = selectedUserId,
+			ItemId = selectedItemId,
+			Amount = itemAmountBox.Text,
+		})
+	end)
+
+	statusLabel = createTextLabel(panel, "Status", "Ready", UDim2.fromOffset(14, 452), UDim2.new(1, -28, 0, 34), 14)
 	statusLabel.TextColor3 = Color3.fromRGB(205, 255, 170)
 
 	openButton = createButton(screenGui, "OpenAdmin", "Admin", UDim2.new(1, -92, 0.5, 130), getUIProfile().OpenButtonSize)

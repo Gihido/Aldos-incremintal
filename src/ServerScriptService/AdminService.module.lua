@@ -1,12 +1,15 @@
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DataService = require(script.Parent.DataService)
 local ItemService = require(script.Parent.ItemService)
 local UpgradeService = require(script.Parent.UpgradeService)
 local LeaderboardService = require(script.Parent.LeaderboardService)
+local ItemConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ItemConfig"))
 
 local ADMIN_NAME = "Doter24_7"
 local MAX_ADD_COINS = 1e15
+local MAX_ADD_ITEMS = 999
 
 local AdminService = {}
 
@@ -113,6 +116,48 @@ local function handleAddCoins(adminPlayer, payload)
 	sendResult(adminPlayer, true, `Added {amount} Coins to {targetPlayer.Name}. New balance: {newCoins}`)
 end
 
+
+local function handleAddItem(adminPlayer, payload)
+	local targetPlayer = getTargetPlayer(payload.TargetUserId)
+
+	if not targetPlayer then
+		sendResult(adminPlayer, false, "Player not found")
+		return
+	end
+
+	local itemId = tostring(payload.ItemId or "")
+
+	if not ItemConfig[itemId] then
+		sendResult(adminPlayer, false, "Unknown item")
+		return
+	end
+
+	local amount = tonumber(payload.Amount)
+
+	if not amount or amount ~= amount or amount == math.huge or amount == -math.huge then
+		sendResult(adminPlayer, false, "Invalid amount")
+		return
+	end
+
+	amount = math.floor(amount)
+
+	if amount <= 0 then
+		sendResult(adminPlayer, false, "Amount must be positive")
+		return
+	end
+
+	amount = math.min(amount, MAX_ADD_ITEMS)
+	local success, message, newCount = ItemService.AddItem(targetPlayer, itemId, amount)
+
+	if success then
+		refreshPlayerSystems(targetPlayer, false)
+		savePlayer(targetPlayer)
+		sendResult(adminPlayer, true, `{message}. {targetPlayer.Name} now has {newCount or DataService.GetItemCount(targetPlayer, itemId)}`)
+	else
+		sendResult(adminPlayer, false, message or "Failed to add item")
+	end
+end
+
 local function handleResetProgress(adminPlayer, payload)
 	local targetPlayer = getTargetPlayer(payload.TargetUserId)
 
@@ -141,6 +186,8 @@ local function handleRequest(player, payload)
 
 	if payload.Action == "AddCoins" then
 		handleAddCoins(player, payload)
+	elseif payload.Action == "AddItem" then
+		handleAddItem(player, payload)
 	elseif payload.Action == "ResetProgress" then
 		handleResetProgress(player, payload)
 	else
