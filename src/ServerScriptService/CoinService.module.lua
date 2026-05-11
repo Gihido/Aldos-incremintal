@@ -73,6 +73,14 @@ local function setCoinCFrame(coin, cframe)
 	end
 end
 
+local function removeCoinGridDecor(coin)
+	for _, child in coin:GetDescendants() do
+		if string.find(child.Name, "GridLine") then
+			child:Destroy()
+		end
+	end
+end
+
 local function getRandomCoinCFrame()
 	local halfSize = zonePart.Size * 0.5
 	local x = random:NextNumber(-halfSize.X, halfSize.X)
@@ -133,6 +141,7 @@ local function spawnCoin()
 
 	local coin = coinTemplate:Clone()
 	coin.Name = "Coin"
+	removeCoinGridDecor(coin)
 	styleCoin(coin)
 	setCoinCFrame(coin, getRandomCoinCFrame())
 	coin.Parent = Workspace
