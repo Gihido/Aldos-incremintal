@@ -68,8 +68,32 @@ end
 local function setCoinCFrame(coin, cframe)
 	if coin:IsA("BasePart") then
 		coin.CFrame = cframe
-	elseif coin:IsA("Model") then
-		coin:PivotTo(cframe)
+		return
+	end
+
+	if not coin:IsA("Model") then
+		return
+	end
+
+	local rootPart = getCoinRootPart(coin)
+
+	if not rootPart then
+		return
+	end
+
+	local rootCFrame = rootPart.CFrame
+
+	for _, part in ipairs(getCoinParts(coin)) do
+		local partOffset = rootCFrame:ToObjectSpace(part.CFrame)
+		part.CFrame = cframe * partOffset
+	end
+end
+
+local function removeCoinGridDecor(coin)
+	for _, child in ipairs(coin:GetDescendants()) do
+		if string.find(child.Name, "GridLine") then
+			child:Destroy()
+		end
 	end
 end
 

@@ -26,7 +26,9 @@ local NOTIFICATION_CONFIG = {
 local UPGRADE_ORDER = { "CoinGain", "MultiCoins", "MaxSpawnCoins" }
 local CARD_WIDTH = 390
 local CARD_HEIGHT = 610
-local CARD_PADDING = 20
+local CARD_PADDING = 22
+local CARD_SIDE_PADDING = 20
+local CARD_EXTRA_SCROLL_SPACE = 180
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -717,6 +719,75 @@ local function createTextBox(parent, name, position, size, color, backgroundImag
 	return box
 end
 
+local function createBoxLabel(parent, name, textValue, font, color, options)
+	options = options or {}
+
+	local label = Instance.new("TextLabel")
+	label.Name = name
+	label.BackgroundTransparency = 1
+	label.BorderSizePixel = 0
+	label.Font = font or Enum.Font.GothamBold
+	label.Position = options.Position or UDim2.fromOffset(8, 6)
+	label.Size = options.Size or UDim2.new(1, -16, 1, -12)
+	label.Text = textValue
+	label.TextColor3 = color or Color3.fromRGB(248, 248, 236)
+	label.TextScaled = options.TextScaled ~= false
+	label.TextSize = options.TextSize or 32
+	label.TextStrokeTransparency = options.TextStrokeTransparency or 0.58
+	label.TextWrapped = options.TextWrapped ~= false
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	label.TextYAlignment = Enum.TextYAlignment.Center
+	label.ZIndex = parent.ZIndex + 5
+	label.Parent = parent
+
+	if options.MinTextSize or options.MaxTextSize then
+		local sizeConstraint = Instance.new("UITextSizeConstraint")
+		sizeConstraint.MinTextSize = options.MinTextSize or 12
+		sizeConstraint.MaxTextSize = options.MaxTextSize or label.TextSize
+		sizeConstraint.Parent = label
+	end
+
+	return label
+end
+
+local function createTooltip(parent)
+	local tooltip = createTextBox(
+		parent,
+		"Tooltip",
+		UDim2.fromOffset(220, 445),
+		UDim2.fromOffset(130, 38),
+		Color3.fromRGB(48, 54, 48),
+		(UIAssetConfig.Tooltip or {}).BackgroundImage,
+		80
+	)
+	tooltip.Visible = false
+
+	local label = createBoxLabel(tooltip, "TooltipText", "+1", Enum.Font.GothamBlack, Color3.fromRGB(255, 252, 220), {
+		TextScaled = false,
+		TextSize = 26,
+		TextStrokeTransparency = 0.62,
+	})
+
+	return tooltip
+end
+
+local function createTextBox(parent, name, position, size, color, backgroundImage, zIndex)
+	local box = Instance.new("Frame")
+	box.Name = name
+	box.BackgroundColor3 = color
+	box.BackgroundTransparency = hasCustomAssetId(backgroundImage) and 1 or 0.06
+	box.BorderSizePixel = 0
+	box.ClipsDescendants = true
+	box.Position = position
+	box.Size = size
+	box.ZIndex = zIndex
+	box.Parent = parent
+	addStroke(box, Color3.fromRGB(235, 235, 220), 2, 0.18)
+	addImageBackground(box, backgroundImage, 0.03, 0.95)
+
+	return box
+end
+
 local function createBoxLabel(parent, name, textValue, font, color)
 	local label = Instance.new("TextLabel")
 	label.Name = name
@@ -827,12 +898,22 @@ local function createUpgradeCard(parent, upgradeId, index)
 	level.ZIndex = 26
 
 	local valueBox = createTextBox(card, "ValueBox", UDim2.fromOffset(34, 180), UDim2.fromOffset(322, 110), Color3.fromRGB(38, 43, 39), assetConfig.ValueBoxBackground, 18)
-	local effect = createBoxLabel(valueBox, "Effect", "+1", Enum.Font.GothamBold, Color3.fromRGB(250, 255, 232))
-	effect.TextStrokeTransparency = 0.46
+	local effect = createBoxLabel(valueBox, "Effect", "+1", Enum.Font.Arcade, Color3.fromRGB(250, 255, 232), {
+		Position = UDim2.fromOffset(12, 14),
+		Size = UDim2.new(1, -24, 1, -28),
+		TextScaled = false,
+		TextSize = 46,
+		TextStrokeTransparency = 0.46,
+		TextWrapped = false,
+	})
 
 	local priceBox = createTextBox(card, "PriceBox", UDim2.fromOffset(34, 318), UDim2.fromOffset(322, 64), Color3.fromRGB(44, 39, 31), assetConfig.PriceBoxBackground, 18)
-	local price = createBoxLabel(priceBox, "Price", "Price : 0 Coins", Enum.Font.GothamBold, Color3.fromRGB(255, 235, 150))
-	price.TextStrokeTransparency = 0.58
+	local price = createBoxLabel(priceBox, "Price", "Price : 0 Coins", Enum.Font.GothamBlack, Color3.fromRGB(255, 235, 150), {
+		TextSize = 30,
+		MinTextSize = 16,
+		MaxTextSize = 32,
+		TextStrokeTransparency = 0.58,
+	})
 
 	local tooltip = createTooltip(card)
 
@@ -961,17 +1042,20 @@ local function setupUpgradeBoard()
 	local cardsScroll = Instance.new("ScrollingFrame")
 	cardsScroll.Name = "CardsScroll"
 	cardsScroll.Active = true
+	cardsScroll.AutomaticCanvasSize = Enum.AutomaticSize.None
 	cardsScroll.BackgroundColor3 = Color3.fromRGB(12, 14, 13)
 	cardsScroll.BackgroundTransparency = 1
 	cardsScroll.BorderSizePixel = 0
 	cardsScroll.CanvasSize = UDim2.fromOffset(0, 0)
 	cardsScroll.ClipsDescendants = true
-	cardsScroll.Position = UDim2.fromOffset(36, 90)
+	cardsScroll.HorizontalScrollBarInset = Enum.ScrollBarInset.Always
+	cardsScroll.Position = UDim2.fromOffset(30, 90)
 	cardsScroll.ScrollingDirection = Enum.ScrollingDirection.X
-	cardsScroll.ScrollBarImageColor3 = Color3.fromRGB(210, 240, 170)
+	cardsScroll.ScrollingEnabled = true
+	cardsScroll.ScrollBarImageColor3 = Color3.fromRGB(230, 230, 230)
 	cardsScroll.ScrollBarImageTransparency = 0
-	cardsScroll.ScrollBarThickness = 10
-	cardsScroll.Size = UDim2.new(1, -72, 0, CARD_HEIGHT + 40)
+	cardsScroll.ScrollBarThickness = 12
+	cardsScroll.Size = UDim2.new(1, -60, 0, CARD_HEIGHT + 48)
 	cardsScroll.VerticalScrollBarInset = Enum.ScrollBarInset.None
 	cardsScroll.ZIndex = 5
 	cardsScroll.Parent = background
@@ -981,15 +1065,16 @@ local function setupUpgradeBoard()
 	cardsContainer.Name = "CardsContainer"
 	cardsContainer.BackgroundTransparency = 1
 	cardsContainer.BorderSizePixel = 0
-	cardsContainer.Position = UDim2.fromOffset(20, 0)
+	cardsContainer.Position = UDim2.fromOffset(CARD_SIDE_PADDING, 0)
 	cardsContainer.Size = UDim2.fromOffset(0, CARD_HEIGHT)
 	cardsContainer.ZIndex = 6
 	cardsContainer.Parent = cardsScroll
 
 	local function updateScrollCanvas()
 		local totalCardsWidth = (#UPGRADE_ORDER * CARD_WIDTH) + ((#UPGRADE_ORDER - 1) * CARD_PADDING)
+		local canvasWidth = totalCardsWidth + (CARD_SIDE_PADDING * 2) + CARD_EXTRA_SCROLL_SPACE
 		cardsContainer.Size = UDim2.fromOffset(totalCardsWidth, CARD_HEIGHT)
-		cardsScroll.CanvasSize = UDim2.fromOffset(totalCardsWidth + 40, 0)
+		cardsScroll.CanvasSize = UDim2.fromOffset(canvasWidth, 0)
 	end
 
 	local layout = Instance.new("UIListLayout")
