@@ -874,6 +874,10 @@ local function setupUpgradeBoard()
 		surfaceGui.Parent = boardPart
 	else
 		surfaceGui:ClearAllChildren()
+		surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+		surfaceGui.CanvasSize = Vector2.new(1600, 900)
+		surfaceGui.PixelsPerStud = 80
+		surfaceGui.LightInfluence = 0
 	end
 
 	surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
