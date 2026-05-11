@@ -101,11 +101,11 @@ local UIAssetConfig = {
 
 	Inventory = {
 		Main = {
-			ToggleButton = "rbxassetid://0",
-			Background = "rbxassetid://0",
+			ToggleButton = "rbxassetid://128844489893070",
+			Background = "rbxassetid://140022583234279",
 			CloseButton = "rbxassetid://0",
 
-			ItemsTabButton = "rbxassetid://0",
+			ItemsTabButton = "rbxassetid://128844489893070",
 			PassivesTabButton = "rbxassetid://0",
 
 			ItemSlotBackground = "rbxassetid://0",
@@ -122,25 +122,25 @@ local UIAssetConfig = {
 
 		Items = {
 			Carrot = {
-				Icon = "rbxassetid://0",
-				SlotBackground = "rbxassetid://0",
-				InfoBackground = "rbxassetid://0",
-				TooltipBackground = "rbxassetid://0",
-				BuffTooltipBackground = "rbxassetid://0",
-				BuffIcon = "rbxassetid://0",
-				ActivateButtonBackground = "rbxassetid://0",
-				DeleteButtonBackground = "rbxassetid://0",
+				Icon = "rbxassetid://93674418075080",
+				SlotBackground = "rbxassetid://99587245115312",
+				InfoBackground = "rbxassetid://102755677512720",
+				TooltipBackground = "rbxassetid://107590106110073",
+				BuffTooltipBackground = "rbxassetid://107590106110073",
+				BuffIcon = "rbxassetid://95282308527722",
+				ActivateButtonBackground = "rbxassetid://77203308839827",
+				DeleteButtonBackground = "rbxassetid://129408383648107",
 			},
 
 			Cucumber = {
-				Icon = "rbxassetid://0",
-				SlotBackground = "rbxassetid://0",
-				InfoBackground = "rbxassetid://0",
-				TooltipBackground = "rbxassetid://0",
-				BuffTooltipBackground = "rbxassetid://0",
-				BuffIcon = "rbxassetid://0",
-				ActivateButtonBackground = "rbxassetid://0",
-				DeleteButtonBackground = "rbxassetid://0",
+				Icon = "rbxassetid://88418733093660",
+				SlotBackground = "rbxassetid://102760269801253",
+				InfoBackground = "rbxassetid://133093722280631",
+				TooltipBackground = "rbxassetid://82336640510983",
+				BuffTooltipBackground = "rbxassetid://82336640510983",
+				BuffIcon = "rbxassetid://73492989732472",
+				ActivateButtonBackground = "rbxassetid://77203308839827",
+				DeleteButtonBackground = "rbxassetid://129408383648107",
 			},
 
 			Tomato = {
