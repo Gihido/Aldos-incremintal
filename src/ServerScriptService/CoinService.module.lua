@@ -6,8 +6,8 @@ local ServerStorage = game:GetService("ServerStorage")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
-local DataService = require(script.Parent.DataService)
-local UpgradeService = require(script.Parent.UpgradeService)
+local DataService = require(script.Parent:WaitForChild("DataService"))
+local UpgradeService = require(script.Parent:WaitForChild("UpgradeService"))
 
 local RESPAWN_SECONDS = 1
 local FILL_CHECK_SECONDS = 1
@@ -142,6 +142,143 @@ local function setCoinCFrame(coin, cframe)
 		local partOffset = rootCFrame:ToObjectSpace(part.CFrame)
 		part.CFrame = cframe * partOffset
 	end
+
+	syncPlayer(player)
+
+	removeActiveCoin(coin)
+	coin:Destroy()
+
+	scheduleCoinRespawn()
+end
+
+local function animateCoinToPosition(coin, targetPosition, duration)
+	local startedAt = os.clock()
+	local startCFrame = getCoinCFrame(coin)
+	local startPosition = startCFrame.Position
+
+	while coin and coin.Parent and os.clock() - startedAt < duration do
+		local alpha = math.clamp((os.clock() - startedAt) / duration, 0, 1)
+		local eased = 1 - ((1 - alpha) * (1 - alpha))
+		local position = startPosition:Lerp(targetPosition, eased)
+
+		setCoinCFrame(coin, CFrame.new(position))
+
+		RunService.Heartbeat:Wait()
+	end
+
+	if coin and coin.Parent then
+		setCoinCFrame(coin, CFrame.new(targetPosition))
+	end
+end
+
+local function runCoinChase(player, coin, amount)
+	local root = getPlayerRoot(player)
+
+	if not root then
+		cancelCollectedCoin(coin)
+		return
+	end
+
+	local startedAt = os.clock()
+	local speed = START_CHASE_SPEED
+	local rotation = 0
+
+	local startPosition = getCoinPosition(coin)
+	local awayDirection = startPosition - root.Position
+
+	if awayDirection.Magnitude < 0.1 then
+		awayDirection = Vector3.new(random:NextNumber() - 0.5, 0, random:NextNumber() - 0.5)
+	end
+
+	awayDirection = Vector3.new(awayDirection.X, 0, awayDirection.Z)
+
+	if awayDirection.Magnitude < 0.1 then
+		awayDirection = Vector3.new(1, 0, 0)
+	end
+
+	createCoinLaunchRingEffect(coin)
+
+	local liftPosition = startPosition + Vector3.new(0, 3, 0) + (awayDirection.Unit * 2)
+	animateCoinToPosition(coin, liftPosition, COIN_LAUNCH_SECONDS)
+
+	while coin and coin.Parent do
+		root = getPlayerRoot(player)
+
+		if not root then
+			cancelCollectedCoin(coin)
+			return
+		end
+
+		local currentPosition = getCoinPosition(coin)
+		local targetPosition = root.Position + Vector3.new(0, 1.2, 0)
+
+		local direction = targetPosition - currentPosition
+		local distance = direction.Magnitude
+
+		if distance <= HIT_DISTANCE then
+			finishCoinCollection(player, coin, amount)
+			return
+		end
+
+		local deltaTime = RunService.Heartbeat:Wait()
+
+		speed = math.min(MAX_CHASE_SPEED, speed + (CHASE_ACCELERATION * deltaTime))
+
+		if os.clock() - startedAt > CHASE_TIMEOUT_SECONDS then
+			speed = MAX_CHASE_SPEED
+		end
+
+		if direction.Magnitude > 0.001 then
+			local step = math.min(distance, speed * deltaTime)
+			local newPosition = currentPosition + (direction.Unit * step)
+
+			rotation += deltaTime * 12
+
+			local newCFrame =
+				CFrame.new(newPosition)
+				* CFrame.Angles(rotation, rotation * 0.7, rotation * 0.35)
+
+			setCoinCFrame(coin, newCFrame)
+		end
+	end
+end
+
+local function startCoinChasePlayer(player, coin, amount)
+	task.spawn(function()
+		local ok, err = pcall(function()
+			runCoinChase(player, coin, amount)
+		end)
+
+		if not ok then
+			warn("[CoinService] Coin chase failed:", err)
+			cancelCollectedCoin(coin)
+		end
+	end)
+end
+
+local function tryCollectCoinForPlayer(player, coin)
+	if not coin or not coin.Parent or coin:GetAttribute("Collected") then
+		return
+	end
+
+	print("[CoinService] Try collect:", player.Name, coin.Name)
+
+	local root = getPlayerRoot(player)
+
+	if not root or not isPlayerInsideZone(player) then
+		return
+	end
+
+	coin:SetAttribute("Collected", true)
+	coin:SetAttribute("IsCoin", false)
+
+	for _, part in ipairs(getCoinParts(coin)) do
+		part.CanTouch = false
+		part.CanQuery = false
+	end
+
+	local amount = getCoinsPerPickup(player)
+	startCoinChasePlayer(player, coin, amount)
 end
 
 local function removeActiveCoin(coin)
@@ -484,6 +621,7 @@ end
 
 local function getRandomCoinCFrame()
 	local halfSize = zonePart.Size * 0.5
+
 	local x = random:NextNumber(-halfSize.X, halfSize.X)
 	local z = random:NextNumber(-halfSize.Z, halfSize.Z)
 	local y = halfSize.Y + 1.5
@@ -581,6 +719,7 @@ local function startFillLoop()
 	end
 
 	fillLoopStarted = true
+
 	task.spawn(function()
 		while true do
 			CoinService.FillCoinsToLimit()
