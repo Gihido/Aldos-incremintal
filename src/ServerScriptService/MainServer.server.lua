@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local DataService = require(script.Parent.DataService)
 local UpgradeService = require(script.Parent.UpgradeService)
 local LeaderboardService = require(script.Parent.LeaderboardService)
+local BillboardStatsService = require(script.Parent.BillboardStatsService)
 local CoinService = require(script.Parent.CoinService)
 
 local REMOTE_NAMES = {
@@ -44,4 +45,5 @@ local remotes = getOrCreateRemotes()
 DataService.Init()
 UpgradeService.Init(remotes)
 LeaderboardService.Init()
+BillboardStatsService.Init()
 CoinService.Init(remotes)

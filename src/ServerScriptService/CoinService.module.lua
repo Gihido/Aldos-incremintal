@@ -113,7 +113,7 @@ local function getCoinPosition(coin)
 end
 
 local function setCoinCFrame(coin, cframe)
-	if not coin or not coin.Parent then
+	if not coin then
 		return
 	end
 
@@ -521,11 +521,10 @@ spawnCoin = function()
 
 	local coin = coinTemplate:Clone()
 	coin.Name = "Coin"
+
 	cleanupOldCoinDecor(coin)
 	styleCoin(coin)
 	setCoinCFrame(coin, getRandomCoinCFrame())
-	coin.Parent = Workspace
-	activeCoins[coin] = true
 
 	return math.abs(localPosition.X) <= halfSize.X + margin
 		and math.abs(localPosition.Y) <= halfSize.Y + 5
@@ -535,9 +534,11 @@ end
 	if #coinParts == 0 or not getCoinRootPart(coin) then
 		warn("Spawned coin has no BasePart to collect or animate")
 		coin:Destroy()
-		removeActiveCoin(coin)
 		return false
 	end
+
+	coin.Parent = Workspace
+	activeCoins[coin] = true
 
 	return true
 end
