@@ -24,9 +24,9 @@ local NOTIFICATION_CONFIG = {
 }
 
 local UPGRADE_ORDER = { "CoinGain", "MultiCoins", "MaxSpawnCoins" }
-local CARD_WIDTH = 420
-local CARD_HEIGHT = 245
-local CARD_PADDING = 18
+local CARD_WIDTH = 430
+local CARD_HEIGHT = 690
+local CARD_PADDING = 24
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -111,7 +111,7 @@ end
 
 local function addCorner(parent, radius)
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = radius
+	corner.CornerRadius = UDim.new(0, 0)
 	corner.Parent = parent
 
 	return corner
@@ -338,39 +338,39 @@ local function showNotification(notificationType, message)
 	local isMobileLike = ResponsiveUI.IsMobileLike()
 	notificationCount += 1
 
+	local targetPosition = UDim2.fromScale(0.98, 0.08)
 	local frame = Instance.new("Frame")
 	frame.Name = `Notification{notificationCount}`
-	frame.AnchorPoint = Vector2.new(0, 0)
+	frame.AnchorPoint = Vector2.new(1, 0)
 	frame.BackgroundColor3 = config.Color
-	frame.BackgroundTransparency = 0.08
+	frame.BackgroundTransparency = 0.05
 	frame.BorderSizePixel = 0
 	frame.ClipsDescendants = true
-	frame.Position = UDim2.fromScale(0.025, 0.08)
+	frame.Position = UDim2.fromScale(1.2, 0.08)
 	frame.Size = UDim2.fromOffset(isMobileLike and 280 or 300, isMobileLike and 60 or 66)
 	frame.ZIndex = 100 + (notificationCount * 10)
 	frame.Parent = notificationLayer
 	applyResponsiveScale(frame, 1)
 
-	addCorner(frame, UDim.new(0, 10))
-	addStroke(frame, Color3.fromRGB(245, 245, 235), 2, 0.12)
+	addStroke(frame, Color3.fromRGB(245, 245, 235), 2, 0.1)
 	addGradient(frame, config.Color, Color3.fromRGB(38, 40, 42), 0)
-	addImageBackground(frame, assetConfig.BackgroundImage, 0.14, 0.86)
+	addImageBackground(frame, assetConfig.BackgroundImage, 0.05, 0.94)
 
 	local iconBackground = Instance.new("Frame")
 	iconBackground.Name = "IconBackground"
 	iconBackground.BackgroundColor3 = Color3.fromRGB(18, 20, 18)
-	iconBackground.BackgroundTransparency = 0.1
+	iconBackground.BackgroundTransparency = 0.05
 	iconBackground.BorderSizePixel = 0
 	iconBackground.Position = UDim2.fromOffset(9, 9)
 	iconBackground.Size = UDim2.fromOffset(42, 42)
 	iconBackground.ZIndex = frame.ZIndex + 4
 	iconBackground.Parent = frame
-	addCorner(iconBackground, UDim.new(0, 8))
 	addStroke(iconBackground, Color3.fromRGB(255, 255, 245), 1.5, 0.25)
 
 	local icon = Instance.new("ImageLabel")
 	icon.Name = "Icon"
 	icon.BackgroundTransparency = 1
+	icon.BorderSizePixel = 0
 	icon.Image = assetConfig.IconImage or "rbxassetid://0"
 	icon.Position = UDim2.fromOffset(7, 7)
 	icon.ScaleType = Enum.ScaleType.Fit
@@ -381,7 +381,7 @@ local function showNotification(notificationType, message)
 	local label = Instance.new("TextLabel")
 	label.Name = "Message"
 	label.BackgroundColor3 = Color3.fromRGB(12, 14, 13)
-	label.BackgroundTransparency = 0.22
+	label.BackgroundTransparency = 0.12
 	label.BorderSizePixel = 0
 	label.Font = Enum.Font.GothamBold
 	label.Position = UDim2.fromOffset(60, 7)
@@ -396,9 +396,8 @@ local function showNotification(notificationType, message)
 	label.Parent = frame
 	addCorner(label, UDim.new(0, 6))
 
-	frame.BackgroundTransparency = 0.32
-	TweenService:Create(frame, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		BackgroundTransparency = 0.08,
+	TweenService:Create(frame, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Position = targetPosition,
 	}):Play()
 
 	task.delay(3, function()
@@ -407,6 +406,7 @@ local function showNotification(notificationType, message)
 		end
 
 		local outTween = TweenService:Create(frame, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+			Position = UDim2.fromScale(1.2, 0.08),
 			BackgroundTransparency = 1,
 		})
 
@@ -450,11 +450,27 @@ function addImageBackground(parent, imageId, imageTransparency, overlayTranspare
 		return nil
 	end
 
+	local fillColor = parent.BackgroundColor3
+	parent.BackgroundTransparency = 1
+	parent.BorderSizePixel = 0
+	parent.ClipsDescendants = true
+
+	local fill = Instance.new("Frame")
+	fill.Name = "BackgroundFill"
+	fill.BackgroundColor3 = fillColor
+	fill.BackgroundTransparency = 0.03
+	fill.BorderSizePixel = 0
+	fill.Position = UDim2.fromScale(0, 0)
+	fill.Size = UDim2.fromScale(1, 1)
+	fill.ZIndex = parent.ZIndex
+	fill.Parent = parent
+
 	local image = Instance.new("ImageLabel")
 	image.Name = "CustomBackgroundImage"
 	image.BackgroundTransparency = 1
+	image.BorderSizePixel = 0
 	image.Image = imageId
-	image.ImageTransparency = imageTransparency or 0.18
+	image.ImageTransparency = imageTransparency or 0.05
 	image.Position = UDim2.fromScale(0, 0)
 	image.ScaleType = Enum.ScaleType.Stretch
 	image.Size = UDim2.fromScale(1, 1)
@@ -463,8 +479,8 @@ function addImageBackground(parent, imageId, imageTransparency, overlayTranspare
 
 	local overlay = Instance.new("Frame")
 	overlay.Name = "ReadabilityOverlay"
-	overlay.BackgroundColor3 = Color3.fromRGB(8, 10, 9)
-	overlay.BackgroundTransparency = overlayTransparency or 0.82
+	overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	overlay.BackgroundTransparency = overlayTransparency or 0.92
 	overlay.BorderSizePixel = 0
 	overlay.Position = UDim2.fromScale(0, 0)
 	overlay.Size = UDim2.fromScale(1, 1)
@@ -472,6 +488,10 @@ function addImageBackground(parent, imageId, imageTransparency, overlayTranspare
 	overlay.Parent = parent
 
 	return image
+end
+
+local function getCardBackground(assetConfig)
+	return assetConfig.CardBackground or assetConfig.BackgroundImage
 end
 
 local function showTooltip(button, tooltip, text)
@@ -496,19 +516,33 @@ local function hideTooltip(tooltip)
 	tooltip.Visible = false
 end
 
-local function styleButton(button, colorA, colorB, strokeColor, textColor)
+local function styleButton(button, colorA, colorB, strokeColor, textColor, backgroundImage)
 	button.AutoButtonColor = false
 	button.BackgroundColor3 = colorB
-	button.BackgroundTransparency = 0.03
+	button.BackgroundTransparency = hasCustomAssetId(backgroundImage) and 1 or 0.03
 	button.BorderSizePixel = 0
-	button.Font = Enum.Font.GothamBold
-	button.TextColor3 = textColor
-	button.TextScaled = true
-	button.TextStrokeTransparency = 0.72
+	button.Text = ""
+	button.TextTransparency = 1
 	button.ZIndex = 30
-	addCorner(button, UDim.new(0, 8))
-	local stroke = addStroke(button, strokeColor, 2, 0.12)
+	button.ClipsDescendants = true
+	button:SetAttribute("UsesImageBackground", hasCustomAssetId(backgroundImage))
+	local stroke = addStroke(button, strokeColor, 2, 0.1)
 	addGradient(button, colorA, colorB, 90)
+	addImageBackground(button, backgroundImage, 0.03, 0.95)
+
+	local label = Instance.new("TextLabel")
+	label.Name = "ButtonText"
+	label.BackgroundTransparency = 1
+	label.BorderSizePixel = 0
+	label.Font = Enum.Font.GothamBold
+	label.Position = UDim2.fromScale(0, 0)
+	label.Size = UDim2.fromScale(1, 1)
+	label.Text = button.Name == "BuyMax" and "Buy Max" or "Buy"
+	label.TextColor3 = textColor
+	label.TextScaled = true
+	label.TextStrokeTransparency = 0.72
+	label.ZIndex = button.ZIndex + 5
+	label.Parent = button
 
 	local scale = Instance.new("UIScale")
 	scale.Scale = 1
@@ -526,7 +560,7 @@ local function styleButton(button, colorA, colorB, strokeColor, textColor)
 	end)
 
 	button.MouseLeave:Connect(function()
-		stroke.Transparency = 0.12
+		stroke.Transparency = 0.1
 		tweenScale(1)
 	end)
 
@@ -631,45 +665,69 @@ local function playPurchaseEffect(button, upgradeId)
 	end
 end
 
-local function createTooltip(parent)
-	local tooltip = Instance.new("Frame")
-	tooltip.Name = "Tooltip"
-	tooltip.BackgroundColor3 = Color3.fromRGB(48, 54, 48)
-	tooltip.BackgroundTransparency = 0.08
-	tooltip.BorderSizePixel = 0
-	tooltip.ClipsDescendants = true
-	tooltip.Size = UDim2.fromOffset(176, 42)
-	tooltip.Visible = false
-	tooltip.ZIndex = 80
-	tooltip.Parent = parent
-	addCorner(tooltip, UDim.new(0, 8))
-	addStroke(tooltip, Color3.fromRGB(224, 242, 186), 1.5, 0.08)
-	addGradient(tooltip, Color3.fromRGB(72, 84, 66), Color3.fromRGB(25, 28, 24), 90)
-	addImageBackground(tooltip, (UIAssetConfig.Tooltip or {}).BackgroundImage, 0.16, 0.88)
+local function createTextBox(parent, name, position, size, color, backgroundImage, zIndex)
+	local box = Instance.new("Frame")
+	box.Name = name
+	box.BackgroundColor3 = color
+	box.BackgroundTransparency = hasCustomAssetId(backgroundImage) and 1 or 0.06
+	box.BorderSizePixel = 0
+	box.ClipsDescendants = true
+	box.Position = position
+	box.Size = size
+	box.ZIndex = zIndex
+	box.Parent = parent
+	addStroke(box, Color3.fromRGB(235, 235, 220), 2, 0.18)
+	addImageBackground(box, backgroundImage, 0.03, 0.95)
 
+	return box
+end
+
+local function createBoxLabel(parent, name, textValue, font, color)
 	local label = Instance.new("TextLabel")
-	label.Name = "TooltipText"
+	label.Name = name
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamBold
-	label.Position = UDim2.fromOffset(8, 4)
-	label.Size = UDim2.new(1, -16, 1, -8)
-	label.Text = "+1"
-	label.TextColor3 = Color3.fromRGB(255, 252, 220)
+	label.BorderSizePixel = 0
+	label.Font = font or Enum.Font.GothamBold
+	label.Position = UDim2.fromOffset(8, 6)
+	label.Size = UDim2.new(1, -16, 1, -12)
+	label.Text = textValue
+	label.TextColor3 = color or Color3.fromRGB(248, 248, 236)
 	label.TextScaled = true
-	label.TextStrokeTransparency = 0.62
+	label.TextStrokeTransparency = 0.58
+	label.TextWrapped = true
 	label.TextXAlignment = Enum.TextXAlignment.Center
-	label.ZIndex = 84
-	label.Parent = tooltip
+	label.TextYAlignment = Enum.TextYAlignment.Center
+	label.ZIndex = parent.ZIndex + 5
+	label.Parent = parent
+
+	return label
+end
+
+local function createTooltip(parent)
+	local tooltip = createTextBox(
+		parent,
+		"Tooltip",
+		UDim2.fromOffset(36, 476),
+		UDim2.fromOffset(140, 42),
+		Color3.fromRGB(48, 54, 48),
+		(UIAssetConfig.Tooltip or {}).BackgroundImage,
+		80
+	)
+	tooltip.Visible = false
+
+	local label = createBoxLabel(tooltip, "TooltipText", "+1", Enum.Font.GothamBold, Color3.fromRGB(255, 252, 220))
+	label.TextStrokeTransparency = 0.62
 
 	return tooltip
 end
 
 local function createUpgradeCard(parent, upgradeId, index)
 	local cardScale
+	local assetConfig = getUpgradeAssetConfig(upgradeId)
 	local card = Instance.new("Frame")
-	card.Name = upgradeId
+	card.Name = `{upgradeId}Card`
 	card.BackgroundColor3 = Color3.fromRGB(24, 26, 25)
-	card.BackgroundTransparency = 0.04
+	card.BackgroundTransparency = hasCustomAssetId(getCardBackground(assetConfig)) and 1 or 0.04
 	card.BorderSizePixel = 0
 	card.ClipsDescendants = true
 	card.LayoutOrder = index
@@ -677,11 +735,9 @@ local function createUpgradeCard(parent, upgradeId, index)
 	card.ZIndex = 10
 	card.Parent = parent
 
-	addCorner(card, UDim.new(0, 10))
 	local cardStroke = addStroke(card, Color3.fromRGB(196, 220, 176), 2, 0.1)
 	addGradient(card, Color3.fromRGB(42, 46, 43), Color3.fromRGB(14, 16, 15), 90)
-	local assetConfig = getUpgradeAssetConfig(upgradeId)
-	addImageBackground(card, assetConfig.BackgroundImage, 0.16, 0.86)
+	addImageBackground(card, getCardBackground(assetConfig), 0.02, 0.96)
 
 	cardScale = Instance.new("UIScale")
 	cardScale.Scale = 1
@@ -690,7 +746,7 @@ local function createUpgradeCard(parent, upgradeId, index)
 	card.MouseEnter:Connect(function()
 		cardStroke.Transparency = 0.02
 		TweenService:Create(cardScale, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			Scale = 1.012,
+			Scale = 1.006,
 		}):Play()
 	end)
 
@@ -701,97 +757,67 @@ local function createUpgradeCard(parent, upgradeId, index)
 		}):Play()
 	end)
 
-	local shine = Instance.new("Frame")
-	shine.Name = "TopAccent"
-	shine.BackgroundColor3 = Color3.fromRGB(205, 235, 170)
-	shine.BackgroundTransparency = 0.18
-	shine.BorderSizePixel = 0
-	shine.Position = UDim2.fromOffset(16, 10)
-	shine.Size = UDim2.new(1, -32, 0, 3)
-	shine.ZIndex = 14
-	shine.Parent = card
-
-	local innerFrame = Instance.new("Frame")
-	innerFrame.Name = "InnerFrame"
-	innerFrame.BackgroundTransparency = 1
-	innerFrame.Position = UDim2.fromOffset(11, 11)
-	innerFrame.Size = UDim2.new(1, -22, 1, -22)
-	innerFrame.ZIndex = 15
-	innerFrame.Parent = card
-	addCorner(innerFrame, UDim.new(0, 8))
-	addStroke(innerFrame, Color3.fromRGB(240, 245, 220), 1, 0.72)
-
 	local iconBox = Instance.new("Frame")
 	iconBox.Name = "IconBox"
 	iconBox.BackgroundColor3 = Color3.fromRGB(104, 132, 92)
-	iconBox.BackgroundTransparency = 0.34
+	iconBox.BackgroundTransparency = 0.08
 	iconBox.BorderSizePixel = 0
-	iconBox.Position = UDim2.fromOffset(20, 28)
-	iconBox.Size = UDim2.fromOffset(64, 64)
+	iconBox.ClipsDescendants = true
+	iconBox.Position = UDim2.fromOffset(36, 72)
+	iconBox.Size = UDim2.fromOffset(120, 120)
 	iconBox.ZIndex = 18
 	iconBox.Parent = card
-	addCorner(iconBox, UDim.new(0, 8))
-	addStroke(iconBox, Color3.fromRGB(232, 248, 205), 1.5, 0.18)
+	addStroke(iconBox, Color3.fromRGB(232, 248, 205), 2, 0.12)
 
 	local icon = Instance.new("ImageLabel")
 	icon.Name = "Icon"
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
 	icon.BackgroundTransparency = 1
+	icon.BorderSizePixel = 0
 	icon.Image = assetConfig.IconImage or "rbxassetid://0"
-	icon.Position = UDim2.fromScale(0.12, 0.12)
+	icon.Position = UDim2.fromScale(0.5, 0.5)
 	icon.ScaleType = Enum.ScaleType.Fit
-	icon.Size = UDim2.fromScale(0.76, 0.76)
-	icon.ZIndex = 21
+	icon.Size = UDim2.fromOffset(84, 84)
+	icon.ZIndex = 24
 	icon.Parent = iconBox
-	startUpgradeIconPulse(icon)
 
-	local title = createText(card, "Title", upgradeId, UDim2.fromOffset(98, 26), UDim2.new(1, -118, 0, 34), Enum.Font.GothamBold, Color3.fromRGB(245, 248, 230))
+	local title = createText(card, "Title", upgradeId, UDim2.fromOffset(175, 82), UDim2.fromOffset(210, 44), Enum.Font.GothamBold, Color3.fromRGB(245, 248, 230))
 	title.TextStrokeTransparency = 0.7
-	title.ZIndex = 22
-	local level = createText(card, "Level", "Level 0/0", UDim2.fromOffset(98, 61), UDim2.new(1, -118, 0, 26), Enum.Font.GothamBold, Color3.fromRGB(196, 212, 190))
+	title.TextYAlignment = Enum.TextYAlignment.Center
+	title.ZIndex = 26
+
+	local level = createText(card, "Level", "0/0", UDim2.fromOffset(175, 132), UDim2.fromOffset(160, 42), Enum.Font.GothamBold, Color3.fromRGB(196, 212, 190))
 	level.TextStrokeTransparency = 0.78
-	level.ZIndex = 22
+	level.TextYAlignment = Enum.TextYAlignment.Center
+	level.ZIndex = 26
 
-	local badge = Instance.new("Frame")
-	badge.Name = "Badge"
-	badge.BackgroundColor3 = Color3.fromRGB(111, 174, 78)
-	badge.BorderSizePixel = 0
-	badge.ClipsDescendants = true
-	badge.Position = UDim2.fromOffset(24, 108)
-	badge.Size = UDim2.new(1, -48, 0, 36)
-	badge.ZIndex = 18
-	badge.Parent = card
-	addCorner(badge, UDim.new(0, 8))
-	addStroke(badge, Color3.fromRGB(244, 255, 210), 1.5, 0.14)
-	addGradient(badge, Color3.fromRGB(212, 245, 145), Color3.fromRGB(74, 136, 66), 0)
-	addImageBackground(badge, (UIAssetConfig.BonusBadge or {}).BackgroundImage, 0.18, 0.88)
+	local valueBox = createTextBox(card, "ValueBox", UDim2.fromOffset(36, 225), UDim2.fromOffset(358, 135), Color3.fromRGB(38, 43, 39), assetConfig.ValueBoxBackground, 18)
+	local effect = createBoxLabel(valueBox, "Effect", "+1", Enum.Font.GothamBold, Color3.fromRGB(250, 255, 232))
+	effect.TextStrokeTransparency = 0.46
 
-	local effect = createText(badge, "Effect", "+1", UDim2.fromOffset(8, 2), UDim2.new(1, -16, 1, -4), Enum.Font.GothamBold, Color3.fromRGB(250, 255, 232))
-	effect.TextXAlignment = Enum.TextXAlignment.Center
-	effect.TextStrokeTransparency = 0.48
-	effect.ZIndex = 24
+	local priceBox = createTextBox(card, "PriceBox", UDim2.fromOffset(36, 390), UDim2.fromOffset(358, 78), Color3.fromRGB(44, 39, 31), assetConfig.PriceBoxBackground, 18)
+	local price = createBoxLabel(priceBox, "Price", "Price : 0 Coins", Enum.Font.GothamBold, Color3.fromRGB(255, 235, 150))
+	price.TextStrokeTransparency = 0.58
 
-	local price = createText(card, "Price", "Price: 0 coins", UDim2.fromOffset(24, 153), UDim2.new(1, -48, 0, 28), Enum.Font.GothamBold, Color3.fromRGB(255, 235, 150))
-	price.TextXAlignment = Enum.TextXAlignment.Center
-	price.TextStrokeTransparency = 0.62
-	price.ZIndex = 22
+	local bonusMiniBox = createTextBox(card, "BonusMiniBox", UDim2.fromOffset(248, 476), UDim2.fromOffset(140, 42), Color3.fromRGB(42, 52, 40), assetConfig.BonusMiniBoxBackground, 18)
+	local bonusMini = createBoxLabel(bonusMiniBox, "BonusMini", "+1", Enum.Font.GothamBold, Color3.fromRGB(238, 255, 205))
+	bonusMini.TextStrokeTransparency = 0.58
 
 	local tooltip = createTooltip(card)
 
 	local buyButton = Instance.new("TextButton")
 	buyButton.Name = "Buy"
-	buyButton.Position = UDim2.fromOffset(28, 192)
-	buyButton.Size = UDim2.fromOffset(168, 38)
-	buyButton.Text = "Buy"
+	buyButton.Position = UDim2.fromOffset(36, 525)
+	buyButton.Size = UDim2.fromOffset(136, 100)
 	buyButton.Parent = card
-	styleButton(buyButton, Color3.fromRGB(176, 226, 118), Color3.fromRGB(62, 142, 62), Color3.fromRGB(232, 255, 198), Color3.fromRGB(12, 28, 10))
+	styleButton(buyButton, Color3.fromRGB(176, 226, 118), Color3.fromRGB(62, 142, 62), Color3.fromRGB(232, 255, 198), Color3.fromRGB(12, 28, 10), assetConfig.BuyButtonBackground)
 
 	local buyMaxButton = Instance.new("TextButton")
 	buyMaxButton.Name = "BuyMax"
-	buyMaxButton.Position = UDim2.fromOffset(224, 192)
-	buyMaxButton.Size = UDim2.fromOffset(168, 38)
-	buyMaxButton.Text = "Buy Max"
+	buyMaxButton.Position = UDim2.fromOffset(230, 525)
+	buyMaxButton.Size = UDim2.fromOffset(164, 100)
 	buyMaxButton.Parent = card
-	styleButton(buyMaxButton, Color3.fromRGB(242, 210, 132), Color3.fromRGB(128, 112, 82), Color3.fromRGB(255, 244, 205), Color3.fromRGB(255, 255, 245))
+	styleButton(buyMaxButton, Color3.fromRGB(242, 210, 132), Color3.fromRGB(128, 112, 82), Color3.fromRGB(255, 244, 205), Color3.fromRGB(255, 255, 245), assetConfig.BuyMaxButtonBackground)
 
 	local cardData = {
 		Frame = card,
@@ -799,6 +825,7 @@ local function createUpgradeCard(parent, upgradeId, index)
 		Level = level,
 		Effect = effect,
 		Price = price,
+		BonusMini = bonusMini,
 		Tooltip = tooltip,
 		Buy = buyButton,
 		BuyMax = buyMaxButton,
@@ -881,8 +908,8 @@ local function setupUpgradeBoard()
 	end
 
 	surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
-	surfaceGui.CanvasSize = Vector2.new(1400, 650)
-	surfaceGui.PixelsPerStud = 85
+	surfaceGui.CanvasSize = Vector2.new(1500, 880)
+	surfaceGui.PixelsPerStud = 90
 	surfaceGui.LightInfluence = 0
 
 	local background = Instance.new("Frame")
@@ -890,13 +917,13 @@ local function setupUpgradeBoard()
 	background.BackgroundColor3 = Color3.fromRGB(6, 8, 7)
 	background.BackgroundTransparency = 0.04
 	background.BorderSizePixel = 0
+	background.ClipsDescendants = true
 	background.Size = UDim2.fromScale(1, 1)
 	background.Parent = surfaceGui
-	addCorner(background, UDim.new(0, 10))
 	addStroke(background, Color3.fromRGB(190, 235, 135), 2, 0.2)
 	addGradient(background, Color3.fromRGB(28, 32, 30), Color3.fromRGB(5, 6, 6), 90)
 
-	local title = createText(background, "Title", "Coin Upgrades", UDim2.fromScale(0.03, 0.025), UDim2.fromScale(0.94, 0.105), Enum.Font.GothamBold, Color3.fromRGB(225, 245, 190))
+	local title = createText(background, "Title", "Coin Upgrades", UDim2.fromOffset(36, 24), UDim2.new(1, -72, 0, 70), Enum.Font.GothamBold, Color3.fromRGB(225, 245, 190))
 	title.TextXAlignment = Enum.TextXAlignment.Center
 	title.TextStrokeTransparency = 0.55
 
@@ -904,35 +931,36 @@ local function setupUpgradeBoard()
 	cardsScroll.Name = "CardsScroll"
 	cardsScroll.Active = true
 	cardsScroll.BackgroundColor3 = Color3.fromRGB(12, 14, 13)
-	cardsScroll.BackgroundTransparency = 0.28
+	cardsScroll.BackgroundTransparency = 0.22
 	cardsScroll.BorderSizePixel = 0
-	cardsScroll.CanvasSize = UDim2.fromOffset((#UPGRADE_ORDER * CARD_WIDTH) + ((#UPGRADE_ORDER - 1) * CARD_PADDING) + 24, 0)
+	cardsScroll.CanvasSize = UDim2.fromOffset((#UPGRADE_ORDER * CARD_WIDTH) + ((#UPGRADE_ORDER - 1) * CARD_PADDING) + 52, 0)
 	cardsScroll.ClipsDescendants = true
-	cardsScroll.Position = UDim2.fromScale(0.03, 0.19)
+	cardsScroll.Position = UDim2.fromOffset(36, 110)
 	cardsScroll.ScrollingDirection = Enum.ScrollingDirection.X
 	cardsScroll.ScrollBarImageColor3 = Color3.fromRGB(210, 240, 170)
 	cardsScroll.ScrollBarImageTransparency = 0.15
 	cardsScroll.ScrollBarThickness = 10
-	cardsScroll.Size = UDim2.fromScale(0.94, 0.70)
+	cardsScroll.Size = UDim2.new(1, -72, 0, 740)
 	cardsScroll.VerticalScrollBarInset = Enum.ScrollBarInset.None
 	cardsScroll.ZIndex = 5
 	cardsScroll.Parent = background
-	addCorner(cardsScroll, UDim.new(0, 8))
 	addStroke(cardsScroll, Color3.fromRGB(170, 200, 150), 1, 0.55)
 
 	local cardsContainer = Instance.new("Frame")
 	cardsContainer.Name = "CardsContainer"
 	cardsContainer.BackgroundTransparency = 1
-	cardsContainer.Position = UDim2.fromOffset(12, 16)
-	cardsContainer.Size = UDim2.new(0, (#UPGRADE_ORDER * CARD_WIDTH) + ((#UPGRADE_ORDER - 1) * CARD_PADDING), 1, -36)
+	cardsContainer.BorderSizePixel = 0
+	cardsContainer.Position = UDim2.fromOffset(26, 20)
+	cardsContainer.Size = UDim2.fromOffset((#UPGRADE_ORDER * CARD_WIDTH) + ((#UPGRADE_ORDER - 1) * CARD_PADDING), CARD_HEIGHT)
 	cardsContainer.ZIndex = 6
 	cardsContainer.Parent = cardsScroll
 
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 	layout.Padding = UDim.new(0, CARD_PADDING)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.VerticalAlignment = Enum.VerticalAlignment.Center
+	layout.VerticalAlignment = Enum.VerticalAlignment.Top
 	layout.Parent = cardsContainer
 
 	for index, upgradeId in UPGRADE_ORDER do
@@ -952,21 +980,22 @@ local function updateUpgradeBoard(data)
 
 		if upgradeData then
 			card.Title.Text = upgradeData.Name
-			card.Level.Text = `Level {upgradeData.Level}/{upgradeData.MaxLevel}`
+			card.Level.Text = `{upgradeData.Level}/{upgradeData.MaxLevel}`
 			card.Effect.Text = upgradeData.EffectText
+			card.BonusMini.Text = upgradeData.BuyMaxBonusText or "-"
 
 			if upgradeData.IsMaxed then
-				card.Price.Text = "Price: Max"
+				card.Price.Text = "Price : Max"
 				card.Buy.AutoButtonColor = false
 				card.BuyMax.AutoButtonColor = false
-				card.Buy.BackgroundTransparency = 0.45
-				card.BuyMax.BackgroundTransparency = 0.45
+				card.Buy.BackgroundTransparency = card.Buy:GetAttribute("UsesImageBackground") and 1 or 0.45
+				card.BuyMax.BackgroundTransparency = card.BuyMax:GetAttribute("UsesImageBackground") and 1 or 0.45
 			else
-				card.Price.Text = `Price: {upgradeData.PriceFormatted} coins`
+				card.Price.Text = `Price : {upgradeData.PriceFormatted} Coins`
 				card.Buy.AutoButtonColor = false
 				card.BuyMax.AutoButtonColor = false
-				card.Buy.BackgroundTransparency = 0
-				card.BuyMax.BackgroundTransparency = 0
+				card.Buy.BackgroundTransparency = card.Buy:GetAttribute("UsesImageBackground") and 1 or 0
+				card.BuyMax.BackgroundTransparency = card.BuyMax:GetAttribute("UsesImageBackground") and 1 or 0
 			end
 		end
 	end

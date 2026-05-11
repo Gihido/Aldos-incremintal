@@ -1,18 +1,45 @@
 local UIAssetConfig = {
 	UpgradeCards = {
 		CoinGain = {
+			CardBackground = "rbxassetid://0",
 			BackgroundImage = "rbxassetid://0",
 			IconImage = "rbxassetid://0",
+
+			ValueBoxBackground = "rbxassetid://0",
+			PriceBoxBackground = "rbxassetid://0",
+			BonusMiniBoxBackground = "rbxassetid://0",
+
+			BuyButtonBackground = "rbxassetid://0",
+			BuyMaxButtonBackground = "rbxassetid://0",
+
 			PurchaseEffectImage = "rbxassetid://0",
 		},
 		MultiCoins = {
+			CardBackground = "rbxassetid://0",
 			BackgroundImage = "rbxassetid://0",
 			IconImage = "rbxassetid://0",
+
+			ValueBoxBackground = "rbxassetid://0",
+			PriceBoxBackground = "rbxassetid://0",
+			BonusMiniBoxBackground = "rbxassetid://0",
+
+			BuyButtonBackground = "rbxassetid://0",
+			BuyMaxButtonBackground = "rbxassetid://0",
+
 			PurchaseEffectImage = "rbxassetid://0",
 		},
 		MaxSpawnCoins = {
+			CardBackground = "rbxassetid://0",
 			BackgroundImage = "rbxassetid://0",
 			IconImage = "rbxassetid://0",
+
+			ValueBoxBackground = "rbxassetid://0",
+			PriceBoxBackground = "rbxassetid://0",
+			BonusMiniBoxBackground = "rbxassetid://0",
+
+			BuyButtonBackground = "rbxassetid://0",
+			BuyMaxButtonBackground = "rbxassetid://0",
+
 			PurchaseEffectImage = "rbxassetid://0",
 		},
 	},
