@@ -223,130 +223,136 @@ local function cleanupLegacyCoinPickupEffects()
 	end
 end
 
+local function tweenPopupTransparency(popup, value, tweenInfo)
+	for _, descendant in popup:GetDescendants() do
+		if descendant:IsA("TextLabel") or descendant:IsA("TextButton") or descendant:IsA("TextBox") then
+			TweenService:Create(descendant, tweenInfo, {
+				TextTransparency = value,
+				TextStrokeTransparency = value,
+			}):Play()
+		elseif descendant:IsA("ImageLabel") or descendant:IsA("ImageButton") then
+			TweenService:Create(descendant, tweenInfo, {
+				ImageTransparency = value,
+			}):Play()
+		elseif descendant:IsA("Frame") then
+			local targetTransparency = value
+			if descendant.Name == "PopupBackgroundFallback" then
+				targetTransparency = value == 1 and 1 or 0.08
+			end
+
+			TweenService:Create(descendant, tweenInfo, {
+				BackgroundTransparency = targetTransparency,
+			}):Play()
+		end
+	end
+end
+
 local function showCoinPickupPopup(amount)
 	cleanupLegacyCoinPickupEffects()
+
 	local popupLayer = getOrCreateGuiLayer("CoinPickupGui", 20)
-	local isMobileLike = ResponsiveUI.IsMobileLike()
-	local minX = isMobileLike and 0.25 or 0.2
-	local maxX = isMobileLike and 0.75 or 0.8
+	local viewport = ResponsiveUI.GetViewportSize()
+	local isMobileLike = math.min(viewport.X, viewport.Y) <= 700
+	local popupSize = isMobileLike and 62 or 78
+	local minX = isMobileLike and 0.16 or 0.1
+	local maxX = isMobileLike and 0.84 or 0.9
 	local randomX = minX + (math.random() * (maxX - minX))
-	local randomY = 0.72 + (math.random() * 0.12)
-	local startPosition = UDim2.fromScale(randomX, randomY)
-	local endPosition = UDim2.new(
-		startPosition.X.Scale,
-		startPosition.X.Offset,
-		startPosition.Y.Scale,
-		startPosition.Y.Offset - math.random(40, 80)
-	)
-	local targetScale = ResponsiveUI.GetScreenScale()
+	local startY = isMobileLike and (0.91 + (math.random() * 0.03)) or (0.92 + (math.random() * 0.04))
+	local peakY = isMobileLike and (0.75 + (math.random() * 0.05)) or (0.78 + (math.random() * 0.03))
+	local startRotation = math.random(-8, 8)
+	local fallRotation = startRotation + math.random(360, 540)
 
 	local popup = Instance.new("Frame")
 	popup.Name = "CoinPickupPopup"
 	popup.AnchorPoint = Vector2.new(0.5, 0.5)
-	popup.BackgroundColor3 = Color3.fromRGB(74, 74, 78)
-	popup.BackgroundTransparency = 0.12
+	popup.BackgroundColor3 = Color3.fromRGB(52, 56, 50)
+	popup.BackgroundTransparency = 0.08
 	popup.BorderSizePixel = 0
 	popup.ClipsDescendants = true
-	popup.Position = startPosition
-	popup.Size = UDim2.fromOffset(145, 48)
+	popup.Position = UDim2.fromScale(randomX, startY)
+	popup.Rotation = startRotation
+	popup.Size = UDim2.fromOffset(popupSize, popupSize)
 	popup.ZIndex = 20
 	popup.Parent = popupLayer
 
-	addCorner(popup, UDim.new(0, 13))
-	addStroke(popup, Color3.fromRGB(218, 218, 218), 1.5, 0.22)
-	addGradient(popup, Color3.fromRGB(96, 96, 102), Color3.fromRGB(42, 42, 46), 90)
-
-	local scale = Instance.new("UIScale")
-	scale.Scale = targetScale * 0.88
-	scale.Parent = popup
-
-	local backgroundImage
-	local darkOverlay
+	addCorner(popup, UDim.new(0, 0))
+	addStroke(popup, Color3.fromRGB(245, 245, 220), 1.5, 0.18)
 
 	local coinPopupConfig = UIAssetConfig.CoinPickupPopup or {}
 
 	if hasCustomAssetId(coinPopupConfig.BackgroundImage) then
-		backgroundImage = Instance.new("ImageLabel")
+		local backgroundImage = Instance.new("ImageLabel")
 		backgroundImage.Name = "PopupBackgroundImage"
 		backgroundImage.BackgroundTransparency = 1
+		backgroundImage.BorderSizePixel = 0
 		backgroundImage.Image = coinPopupConfig.BackgroundImage
 		backgroundImage.ImageTransparency = 0.08
 		backgroundImage.Position = UDim2.fromScale(0, 0)
 		backgroundImage.ScaleType = Enum.ScaleType.Stretch
 		backgroundImage.Size = UDim2.fromScale(1, 1)
-		backgroundImage.ZIndex = 80
+		backgroundImage.ZIndex = popup.ZIndex + 1
 		backgroundImage.Parent = popup
-
-		darkOverlay = Instance.new("Frame")
-		darkOverlay.Name = "PopupDarkOverlay"
-		darkOverlay.BackgroundColor3 = Color3.fromRGB(24, 24, 26)
-		darkOverlay.BackgroundTransparency = 0.88
-		darkOverlay.BorderSizePixel = 0
-		darkOverlay.Size = UDim2.fromScale(1, 1)
-		darkOverlay.ZIndex = 81
-		darkOverlay.Parent = popup
+	else
+		local fallback = Instance.new("Frame")
+		fallback.Name = "PopupBackgroundFallback"
+		fallback.BackgroundColor3 = Color3.fromRGB(74, 82, 66)
+		fallback.BackgroundTransparency = 0.08
+		fallback.BorderSizePixel = 0
+		fallback.Position = UDim2.fromScale(0, 0)
+		fallback.Size = UDim2.fromScale(1, 1)
+		fallback.ZIndex = popup.ZIndex + 1
+		fallback.Parent = popup
+		addGradient(fallback, Color3.fromRGB(98, 112, 82), Color3.fromRGB(40, 45, 38), 90)
 	end
-
-	local icon = Instance.new("ImageLabel")
-	icon.Name = "Icon"
-	icon.BackgroundTransparency = 1
-	icon.Image = coinPopupConfig.IconImage or "rbxassetid://0"
-	icon.Position = UDim2.fromOffset(10, 9)
-	icon.ScaleType = Enum.ScaleType.Fit
-	icon.Size = UDim2.fromOffset(28, 28)
-	icon.ZIndex = 82
-	icon.Parent = popup
 
 	local text = Instance.new("TextLabel")
 	text.Name = "Amount"
 	text.BackgroundTransparency = 1
 	text.Font = Enum.Font.GothamBlack
-	text.Position = UDim2.fromOffset(45, 0)
-	text.Size = UDim2.new(1, -54, 1, 0)
+	text.Position = UDim2.fromScale(0.05, 0.05)
+	text.Size = UDim2.fromScale(0.9, 0.9)
 	text.Text = `+{FormatNumber(amount)}`
-	text.TextColor3 = Color3.fromRGB(248, 248, 236)
+	text.TextColor3 = Color3.fromRGB(255, 252, 220)
 	text.TextScaled = true
-	text.TextStrokeTransparency = 0.62
-	text.TextXAlignment = Enum.TextXAlignment.Left
-	text.ZIndex = 82
+	text.TextStrokeColor3 = Color3.fromRGB(20, 24, 20)
+	text.TextStrokeTransparency = 0.45
+	text.TextXAlignment = Enum.TextXAlignment.Center
+	text.TextYAlignment = Enum.TextYAlignment.Center
+	text.ZIndex = popup.ZIndex + 2
 	text.Parent = popup
 
-	TweenService:Create(scale, TweenInfo.new(0.14, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		Scale = targetScale,
-	}):Play()
+	local textSizeConstraint = Instance.new("UITextSizeConstraint")
+	textSizeConstraint.MaxTextSize = isMobileLike and 22 or 28
+	textSizeConstraint.MinTextSize = 10
+	textSizeConstraint.Parent = text
 
-	local tweenInfo = TweenInfo.new(0.95, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	local moveTween = TweenService:Create(popup, tweenInfo, {
-		Position = endPosition,
-		BackgroundTransparency = 1,
-	})
-	local textTween = TweenService:Create(text, tweenInfo, {
-		TextTransparency = 1,
-		TextStrokeTransparency = 1,
-	})
-	local iconTween = TweenService:Create(icon, tweenInfo, {
-		ImageTransparency = 1,
+	local tossTween = TweenService:Create(popup, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Position = UDim2.fromScale(randomX, peakY),
+		Rotation = startRotation + math.random(-6, 6),
 	})
 
-	if backgroundImage then
-		TweenService:Create(backgroundImage, tweenInfo, {
-			ImageTransparency = 1,
-		}):Play()
-	end
+	tossTween.Completed:Connect(function()
+		task.delay(0.9, function()
+			if not popup.Parent then
+				return
+			end
 
-	if darkOverlay then
-		TweenService:Create(darkOverlay, tweenInfo, {
-			BackgroundTransparency = 1,
-		}):Play()
-	end
+			local fallTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			local fallTween = TweenService:Create(popup, fallTweenInfo, {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromScale(randomX, 1.08),
+				Rotation = fallRotation,
+			})
 
-	moveTween.Completed:Connect(function()
-		popup:Destroy()
+			tweenPopupTransparency(popup, 1, fallTweenInfo)
+			fallTween.Completed:Connect(function()
+				popup:Destroy()
+			end)
+			fallTween:Play()
+		end)
 	end)
 
-	moveTween:Play()
-	textTween:Play()
-	iconTween:Play()
+	tossTween:Play()
 end
 
 local addImageBackground
@@ -958,15 +964,14 @@ local function setupUpgradeBoard()
 	cardsScroll.BackgroundColor3 = Color3.fromRGB(12, 14, 13)
 	cardsScroll.BackgroundTransparency = 1
 	cardsScroll.BorderSizePixel = 0
-	local totalCardsWidth = (#UPGRADE_ORDER * CARD_WIDTH) + ((#UPGRADE_ORDER - 1) * CARD_PADDING)
-	cardsScroll.CanvasSize = UDim2.fromOffset(totalCardsWidth + 80, 0)
+	cardsScroll.CanvasSize = UDim2.fromOffset(0, 0)
 	cardsScroll.ClipsDescendants = true
 	cardsScroll.Position = UDim2.fromOffset(36, 90)
 	cardsScroll.ScrollingDirection = Enum.ScrollingDirection.X
 	cardsScroll.ScrollBarImageColor3 = Color3.fromRGB(210, 240, 170)
 	cardsScroll.ScrollBarImageTransparency = 0
 	cardsScroll.ScrollBarThickness = 10
-	cardsScroll.Size = UDim2.fromOffset(980, CARD_HEIGHT + 40)
+	cardsScroll.Size = UDim2.new(1, -72, 0, CARD_HEIGHT + 40)
 	cardsScroll.VerticalScrollBarInset = Enum.ScrollBarInset.None
 	cardsScroll.ZIndex = 5
 	cardsScroll.Parent = background
@@ -976,10 +981,16 @@ local function setupUpgradeBoard()
 	cardsContainer.Name = "CardsContainer"
 	cardsContainer.BackgroundTransparency = 1
 	cardsContainer.BorderSizePixel = 0
-	cardsContainer.Position = UDim2.fromOffset(0, 0)
-	cardsContainer.Size = UDim2.fromOffset(totalCardsWidth, CARD_HEIGHT)
+	cardsContainer.Position = UDim2.fromOffset(20, 0)
+	cardsContainer.Size = UDim2.fromOffset(0, CARD_HEIGHT)
 	cardsContainer.ZIndex = 6
 	cardsContainer.Parent = cardsScroll
+
+	local function updateScrollCanvas()
+		local totalCardsWidth = (#UPGRADE_ORDER * CARD_WIDTH) + ((#UPGRADE_ORDER - 1) * CARD_PADDING)
+		cardsContainer.Size = UDim2.fromOffset(totalCardsWidth, CARD_HEIGHT)
+		cardsScroll.CanvasSize = UDim2.fromOffset(totalCardsWidth + 40, 0)
+	end
 
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
@@ -993,6 +1004,7 @@ local function setupUpgradeBoard()
 		createUpgradeCard(cardsContainer, upgradeId, index)
 	end
 
+	updateScrollCanvas()
 	upgradeGuiReady = true
 
 	if latestPlayerData then
