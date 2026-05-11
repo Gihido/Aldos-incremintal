@@ -124,6 +124,12 @@ local UIAssetConfig = {
 		PackTrader = {
 			Background = "rbxassetid://0",
 			TraderImage = "rbxassetid://0",
+			NormalTraderImage = "rbxassetid://0",
+			SuspiciousTraderImage = "rbxassetid://0",
+			AngryTraderImage = "rbxassetid://0",
+
+			DarkFadeImage = "rbxassetid://0",
+			MistFadeImage = "rbxassetid://0",
 
 			DialogBackground = "rbxassetid://0",
 			AnswerButtonBackground = "rbxassetid://0",

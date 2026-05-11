@@ -1,16 +1,21 @@
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DataService = require(script.Parent.DataService)
 local ItemService = require(script.Parent.ItemService)
 local UpgradeService = require(script.Parent.UpgradeService)
-local ItemConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("ItemConfig"))
+local ItemConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ItemConfig"))
 
 local OFFER_SECONDS = 60
-local TOTAL_AMOUNT_OPTIONS = { 3, 6, 9, 12 }
+local SUSPICIOUS_WINDOW_SECONDS = 30
+local SUSPICIOUS_OPEN_LIMIT = 5
+local ANGRY_NOT_ENOUGH_LIMIT = 5
+local TOTAL_AMOUNT_OPTIONS = { 1, 3, 5, 9, 12 }
 local PRICE_MULTIPLIERS = {
+	[1] = 5,
 	[3] = 7.5,
-	[6] = 10,
+	[5] = 9,
 	[9] = 12.5,
 	[12] = 15,
 }
@@ -21,7 +26,7 @@ local PackTraderService = {}
 
 local packTraderActionRemote
 local syncPackTraderRemote
-local offersByPlayer = {}
+local playerStates = {}
 local refreshLoopStarted = false
 local random = Random.new()
 
@@ -48,6 +53,23 @@ local function shuffle(list)
 	return shuffled
 end
 
+local function getState(player)
+	local state = playerStates[player]
+
+	if not state then
+		state = {
+			Offer = nil,
+			Purchased = false,
+			OpenHistory = {},
+			FailedBuyAttempts = 0,
+			DialogState = "Greeting",
+		}
+		playerStates[player] = state
+	end
+
+	return state
+end
+
 local function getBaseCoinsPerPickup(player)
 	if type(UpgradeService.GetCoinsPerPickup) ~= "function" then
 		return 1
@@ -61,9 +83,10 @@ local function chooseTotalAmount()
 	return TOTAL_AMOUNT_OPTIONS[random:NextInteger(1, #TOTAL_AMOUNT_OPTIONS)]
 end
 
-local function chooseItemTypes()
+local function chooseItemTypes(totalAmount)
 	local itemIds = shuffle(getItemIds())
-	local typeCount = random:NextInteger(1, math.min(4, #itemIds))
+	local maxTypes = math.min(4, #itemIds, totalAmount)
+	local typeCount = random:NextInteger(1, math.max(1, maxTypes))
 	local selected = {}
 
 	for index = 1, typeCount do
@@ -88,7 +111,7 @@ local function distributeAmount(totalAmount, selectedItems)
 			amount = random:NextInteger(1, maxForThisSlot)
 		end
 
-		remaining = remaining - amount
+		remaining -= amount
 		table.insert(offerItems, {
 			ItemId = itemId,
 			Amount = amount,
@@ -106,47 +129,43 @@ local function calculatePrice(player, totalAmount)
 	return math.max(1, math.floor(baseCoinsPerPickup * multiplier * totalAmount * randomFactor))
 end
 
-local function copyOffer(offer)
-	if type(offer) ~= "table" then
-		return nil
+local function getOfferRarity(totalAmount)
+	if totalAmount == 1 then
+		return "Обычными"
+	elseif totalAmount == 3 then
+		return "Необычными"
+	elseif totalAmount == 5 then
+		return "Редкими"
+	elseif totalAmount == 9 then
+		return "Эпическими"
+	elseif totalAmount == 12 then
+		return "Легендарными"
 	end
 
-	local items = {}
-
-	for _, item in ipairs(offer.Items or {}) do
-		table.insert(items, {
-			ItemId = item.ItemId,
-			Amount = item.Amount,
-		})
-	end
-
-	return {
-		OfferId = offer.OfferId,
-		ExpiresAt = offer.ExpiresAt,
-		Remaining = math.max(0, (offer.ExpiresAt or os.time()) - os.time()),
-		Items = items,
-		TotalItemAmount = offer.TotalItemAmount,
-		Price = offer.Price,
-	}
+	return "Необычными"
 end
 
 local function generateOffer(player)
+	local state = getState(player)
 	local totalAmount = chooseTotalAmount()
-	local selectedItems = chooseItemTypes()
+	local selectedItems = chooseItemTypes(totalAmount)
 	local offer = {
 		OfferId = HttpService:GenerateGUID(false),
 		ExpiresAt = os.time() + OFFER_SECONDS,
 		Items = distributeAmount(totalAmount, selectedItems),
 		TotalItemAmount = totalAmount,
+		Rarity = getOfferRarity(totalAmount),
 		Price = calculatePrice(player, totalAmount),
 	}
 
-	offersByPlayer[player] = offer
+	state.Offer = offer
+	state.Purchased = false
 	return offer
 end
 
 local function getOffer(player)
-	local offer = offersByPlayer[player]
+	local state = getState(player)
+	local offer = state.Offer
 
 	if not offer or (offer.ExpiresAt or 0) <= os.time() then
 		offer = generateOffer(player)
@@ -155,29 +174,100 @@ local function getOffer(player)
 	return offer
 end
 
-function PackTraderService.SyncPlayer(player, resultType, message)
+local function copyOffer(offer, state)
+	if type(offer) ~= "table" then
+		return nil
+	end
+
+	local items = {}
+
+	if not state.Purchased then
+		for _, item in ipairs(offer.Items or {}) do
+			table.insert(items, {
+				ItemId = item.ItemId,
+				Amount = item.Amount,
+			})
+		end
+	end
+
+	return {
+		OfferId = offer.OfferId,
+		ExpiresAt = offer.ExpiresAt,
+		Remaining = math.max(0, (offer.ExpiresAt or os.time()) - os.time()),
+		Items = items,
+		TotalItemAmount = offer.TotalItemAmount,
+		Rarity = offer.Rarity or getOfferRarity(offer.TotalItemAmount),
+		Price = offer.Price,
+		Purchased = state.Purchased == true,
+	}
+end
+
+local function cleanOpenHistory(state, now)
+	local freshHistory = {}
+
+	for _, openedAt in ipairs(state.OpenHistory) do
+		if now - openedAt <= SUSPICIOUS_WINDOW_SECONDS then
+			table.insert(freshHistory, openedAt)
+		end
+	end
+
+	state.OpenHistory = freshHistory
+	return freshHistory
+end
+
+function PackTraderService.SyncPlayer(player, resultType, message, dialogState)
 	if not player or not syncPackTraderRemote then
 		return
 	end
 
+	local state = getState(player)
 	local offer = getOffer(player)
 	syncPackTraderRemote:FireClient(player, {
-		Offer = copyOffer(offer),
+		Offer = copyOffer(offer, state),
+		DialogState = dialogState or state.DialogState or "Greeting",
+		FailedBuyAttempts = state.FailedBuyAttempts,
 		ResultType = resultType,
 		Message = message,
 	})
 end
 
 function PackTraderService.RefreshOffer(player, resultType, message)
+	local state = getState(player)
+	state.DialogState = "Greeting"
 	generateOffer(player)
-	PackTraderService.SyncPlayer(player, resultType, message)
+	PackTraderService.SyncPlayer(player, resultType, message, "Greeting")
+end
+
+function PackTraderService.RegisterOpen(player)
+	local state = getState(player)
+	local now = os.time()
+	local history = cleanOpenHistory(state, now)
+	table.insert(history, now)
+	state.OpenHistory = history
+
+	if #history > SUSPICIOUS_OPEN_LIMIT then
+		state.DialogState = "Suspicious"
+		PackTraderService.SyncPlayer(player, "Limit", "Suspicious trader", "Suspicious")
+		return
+	end
+
+	state.DialogState = "Greeting"
+	PackTraderService.SyncPlayer(player, nil, nil, "Greeting")
+end
+
+function PackTraderService.ClearSpecialState(player)
+	local state = getState(player)
+	state.DialogState = "Greeting"
+	state.FailedBuyAttempts = 0
+	PackTraderService.SyncPlayer(player, nil, nil, "Greeting")
 end
 
 function PackTraderService.BuyOffer(player)
+	local state = getState(player)
 	local offer = getOffer(player)
 
 	if not offer then
-		PackTraderService.SyncPlayer(player, "Error", "No offer")
+		PackTraderService.SyncPlayer(player, "Error", "No offer", state.DialogState)
 		return false, "No offer"
 	end
 
@@ -186,16 +276,30 @@ function PackTraderService.BuyOffer(player)
 		return false, "Offer expired"
 	end
 
+	if state.Purchased then
+		PackTraderService.SyncPlayer(player, "Limit", "Подожди обновления магазина.", "SoldOut")
+		return false, "Offer already purchased"
+	end
+
 	local data = DataService.Get(player)
 	local price = tonumber(offer.Price) or 0
 
 	if (data.Coins or 0) < price then
-		PackTraderService.SyncPlayer(player, "NotEnough", "Not enough Coins")
+		state.FailedBuyAttempts += 1
+
+		if state.FailedBuyAttempts >= ANGRY_NOT_ENOUGH_LIMIT then
+			state.DialogState = "Angry"
+			PackTraderService.SyncPlayer(player, "NotEnough", "Not enough Coins", "Angry")
+		else
+			PackTraderService.SyncPlayer(player, "NotEnough", "Not enough Coins", "Offers")
+		end
+
 		return false, "Not enough Coins"
 	end
 
 	if not DataService.SpendCoins(player, price) then
-		PackTraderService.SyncPlayer(player, "NotEnough", "Not enough Coins")
+		state.FailedBuyAttempts += 1
+		PackTraderService.SyncPlayer(player, "NotEnough", "Not enough Coins", "Offers")
 		return false, "Not enough Coins"
 	end
 
@@ -203,7 +307,10 @@ function PackTraderService.BuyOffer(player)
 		ItemService.AddItem(player, item.ItemId, item.Amount)
 	end
 
-	PackTraderService.RefreshOffer(player, "Success", "Offer purchased")
+	state.Purchased = true
+	state.FailedBuyAttempts = 0
+	state.DialogState = "SoldOut"
+	PackTraderService.SyncPlayer(player, "Success", "Offer purchased", "SoldOut")
 
 	if type(DataService.SavePlayer) == "function" then
 		task.defer(function()
@@ -220,8 +327,12 @@ local function handleAction(player, payload)
 		return
 	end
 
-	if payload.Action == "BuyOffer" then
+	if payload.Action == "OpenTrader" then
+		PackTraderService.RegisterOpen(player)
+	elseif payload.Action == "BuyOffer" then
 		PackTraderService.BuyOffer(player)
+	elseif payload.Action == "ClearSpecialState" then
+		PackTraderService.ClearSpecialState(player)
 	elseif payload.Action == "RequestSync" then
 		PackTraderService.SyncPlayer(player)
 	else
@@ -241,7 +352,8 @@ local function startRefreshLoop()
 			local now = os.time()
 
 			for _, player in ipairs(Players:GetPlayers()) do
-				local offer = offersByPlayer[player]
+				local state = getState(player)
+				local offer = state.Offer
 
 				if not offer or (offer.ExpiresAt or 0) <= now then
 					PackTraderService.RefreshOffer(player)
@@ -273,7 +385,7 @@ function PackTraderService.Init(remotes)
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)
-		offersByPlayer[player] = nil
+		playerStates[player] = nil
 	end)
 
 	for _, player in ipairs(Players:GetPlayers()) do

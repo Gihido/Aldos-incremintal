@@ -24,16 +24,22 @@ local syncPackTraderRemote = remotes:WaitForChild("SyncPackTrader")
 
 local TWEEN_IN = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local TWEEN_OUT = TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-local DIALOG_DEFAULT_TEXT = "Здравствуй, странник, ты что-то хотел?"
-local DIALOG_NO_TEXT = "Понял тебя — как хочешь."
+local TYPEWRITER_SECONDS_PER_CHAR = 0.028
+local DIALOG_SPEAKER = "Торговец"
 local FALLBACK_BACKGROUND = Color3.fromRGB(22, 28, 36)
 local FALLBACK_STROKE = Color3.fromRGB(210, 220, 235)
 
 local ui = {}
 local baseLayout = {}
 local latestOffer
+local latestDialogState = "Greeting"
 local offerSlots = {}
 local activeTooltipSlot
+local dialogToken = 0
+local answer1Action
+local answer2Action
+local introPlayedForInventoryOpen = false
+local lastInventoryVisible = false
 
 local function hasCustomAssetId(assetId)
 	return type(assetId) == "string" and assetId ~= "" and assetId ~= "rbxassetid://0"
@@ -59,6 +65,24 @@ local function getItemAssets(itemId)
 	return (getInventoryAssets().Items and getInventoryAssets().Items[itemId]) or {}
 end
 
+local function getOrCreateLocalNotificationEvent()
+	local event = ReplicatedStorage:FindFirstChild("LocalNotificationEvent")
+
+	if not event then
+		event = Instance.new("BindableEvent")
+		event.Name = "LocalNotificationEvent"
+		event.Parent = ReplicatedStorage
+	end
+
+	return event
+end
+
+local localNotificationEvent = getOrCreateLocalNotificationEvent()
+
+local function notify(notificationType, message)
+	localNotificationEvent:Fire(notificationType or "Error", message or "Ошибка")
+end
+
 local function findChild(parent, name)
 	if not parent then
 		warn("[PackTraderClient] Missing parent while finding", name)
@@ -72,20 +96,6 @@ local function findChild(parent, name)
 	end
 
 	return child
-end
-
-local function getNested(parent, path)
-	local current = parent
-
-	for _, name in ipairs(path) do
-		current = findChild(current, name)
-
-		if not current then
-			return nil
-		end
-	end
-
-	return current
 end
 
 local function ensureStroke(guiObject)
@@ -159,6 +169,7 @@ local function setButtonText(button, text)
 	local label = button and button:FindFirstChild("ButtonText")
 
 	if label and label:IsA("TextLabel") then
+		label.Visible = true
 		label.Text = text
 		styleText(label, 24)
 	end
@@ -177,6 +188,22 @@ local function getHiddenRightPosition(panel, openPosition)
 	)
 end
 
+local function getOfferRarity(totalAmount)
+	if totalAmount == 1 then
+		return "Обычными"
+	elseif totalAmount == 3 then
+		return "Необычными"
+	elseif totalAmount == 5 then
+		return "Редкими"
+	elseif totalAmount == 9 then
+		return "Эпическими"
+	elseif totalAmount == 12 then
+		return "Легендарными"
+	end
+
+	return "Необычными"
+end
+
 local function cacheGui()
 	ui.InventoryMain = findChild(gui, "InventoryMain")
 	ui.CategoryPanel = findChild(ui.InventoryMain, "CategoryPanel")
@@ -191,6 +218,10 @@ local function cacheGui()
 
 	ui.TraderBackground = findChild(ui.PackTraderFrame, "TraderBackground")
 	ui.TraderImage = findChild(ui.PackTraderFrame, "TraderImage")
+	ui.IntroOverlay = ui.PackTraderFrame and ui.PackTraderFrame:FindFirstChild("IntroOverlay")
+	ui.DarkFade = ui.IntroOverlay and ui.IntroOverlay:FindFirstChild("DarkFade")
+	ui.MistFade = ui.IntroOverlay and ui.IntroOverlay:FindFirstChild("MistFade")
+	ui.TraderNameText = ui.PackTraderFrame and ui.PackTraderFrame:FindFirstChild("TraderNameText")
 	ui.DialogPanel = findChild(ui.PackTraderFrame, "DialogPanel")
 	ui.DialogBackground = findChild(ui.DialogPanel, "DialogBackground")
 	ui.DialogText = findChild(ui.DialogPanel, "DialogText")
@@ -211,6 +242,54 @@ local function cacheGui()
 
 	for index = 1, 4 do
 		offerSlots[index] = findChild(ui.OfferItemsFrame, "OfferItemSlot" .. index)
+	end
+end
+
+local function ensureIntroOverlay()
+	if not ui.PackTraderFrame then
+		return
+	end
+
+	if not ui.IntroOverlay then
+		ui.IntroOverlay = Instance.new("Frame")
+		ui.IntroOverlay.Name = "IntroOverlay"
+		ui.IntroOverlay.Size = UDim2.fromScale(1, 1)
+		ui.IntroOverlay.Position = UDim2.fromScale(0, 0)
+		ui.IntroOverlay.BackgroundTransparency = 1
+		ui.IntroOverlay.Visible = false
+		ui.IntroOverlay.ZIndex = 80
+		ui.IntroOverlay.Parent = ui.PackTraderFrame
+	end
+
+	if not ui.DarkFade then
+		ui.DarkFade = Instance.new("ImageLabel")
+		ui.DarkFade.Name = "DarkFade"
+		ui.DarkFade.Size = UDim2.fromScale(1, 1)
+		ui.DarkFade.Position = UDim2.fromScale(0, 0)
+		ui.DarkFade.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+		ui.DarkFade.BackgroundTransparency = 0
+		ui.DarkFade.ZIndex = 81
+		ui.DarkFade.Parent = ui.IntroOverlay
+	end
+
+	if not ui.MistFade then
+		ui.MistFade = Instance.new("ImageLabel")
+		ui.MistFade.Name = "MistFade"
+		ui.MistFade.Size = UDim2.fromScale(1, 1)
+		ui.MistFade.Position = UDim2.fromScale(0, 0)
+		ui.MistFade.BackgroundTransparency = 1
+		ui.MistFade.ZIndex = 82
+		ui.MistFade.Parent = ui.IntroOverlay
+	end
+
+	if not ui.TraderNameText then
+		ui.TraderNameText = Instance.new("TextLabel")
+		ui.TraderNameText.Name = "TraderNameText"
+		ui.TraderNameText.Position = UDim2.fromScale(0.36, 0.02)
+		ui.TraderNameText.Size = UDim2.fromScale(0.58, 0.07)
+		ui.TraderNameText.Text = DIALOG_SPEAKER
+		ui.TraderNameText.ZIndex = 20
+		ui.TraderNameText.Parent = ui.PackTraderFrame
 	end
 end
 
@@ -241,7 +320,6 @@ local function applyAssets()
 	local traderAssets = getPackTraderAssets()
 	setImageOrFallback(ui.PackTraderTabButton, mainAssets.PackTraderTabButton, Color3.fromRGB(45, 70, 95))
 	setImageOrFallback(ui.TraderBackground, traderAssets.Background, Color3.fromRGB(18, 25, 34))
-	setImageOrFallback(ui.TraderImage, traderAssets.TraderImage, Color3.fromRGB(35, 44, 58))
 	setImageOrFallback(ui.DialogBackground, traderAssets.DialogBackground, Color3.fromRGB(24, 32, 44))
 	setImageOrFallback(ui.OffersBackground, traderAssets.OffersBackground, Color3.fromRGB(24, 32, 44))
 	setImageOrFallback(ui.BuyOfferButton, traderAssets.BuyButtonBackground, Color3.fromRGB(55, 110, 55))
@@ -249,6 +327,8 @@ local function applyAssets()
 	setImageOrFallback(ui.TooltipBackground, traderAssets.TooltipBackground, Color3.fromRGB(22, 30, 42))
 	setImageOrFallback(ui.AnswerButton1, traderAssets.AnswerButtonBackground, Color3.fromRGB(45, 70, 95))
 	setImageOrFallback(ui.AnswerButton2, traderAssets.AnswerButtonBackground, Color3.fromRGB(45, 70, 95))
+	setImageOrFallback(ui.DarkFade, traderAssets.DarkFadeImage, Color3.fromRGB(0, 0, 0))
+	setImageOrFallback(ui.MistFade, traderAssets.MistFadeImage, Color3.fromRGB(210, 220, 235))
 
 	for _, slot in ipairs(offerSlots) do
 		local background = slot and slot:FindFirstChild("SlotBackground")
@@ -257,19 +337,136 @@ local function applyAssets()
 end
 
 local function applyTextStyles()
-	for _, object in ipairs({ ui.DialogText, ui.OfferTimerText, ui.OfferTitleText, ui.OfferPriceText, ui.TooltipName, ui.TooltipBoost }) do
+	for _, object in ipairs({ ui.DialogText, ui.OfferTimerText, ui.OfferTitleText, ui.OfferPriceText, ui.TooltipName, ui.TooltipBoost, ui.TraderNameText }) do
 		styleText(object, 28)
 	end
 
-	setButtonText(ui.AnswerButton1, "Привет! Хочу узнать, что сегодня предложишь")
-	setButtonText(ui.AnswerButton2, "Не, сори, я беден")
-	setButtonText(ui.BuyOfferButton, "Купить")
-	setButtonText(ui.BackToDialogButton, "Назад")
+	if ui.TraderNameText then
+		ui.TraderNameText.Text = DIALOG_SPEAKER
+	end
 
 	for _, slot in ipairs(offerSlots) do
 		local itemCount = slot and slot:FindFirstChild("ItemCount")
 		styleText(itemCount, 22)
 	end
+end
+
+local function setTraderImage(state)
+	local traderAssets = getPackTraderAssets()
+	local imageId = traderAssets.NormalTraderImage
+
+	if state == "Suspicious" then
+		imageId = traderAssets.SuspiciousTraderImage
+	elseif state == "Angry" then
+		imageId = traderAssets.AngryTraderImage
+	end
+
+	if not hasCustomAssetId(imageId) then
+		imageId = traderAssets.TraderImage
+	end
+
+	setImageOrFallback(ui.TraderImage, imageId, Color3.fromRGB(35, 44, 58))
+end
+
+local function showAnswerButtons(button1Text, action1, button2Text, action2)
+	answer1Action = action1
+	answer2Action = action2
+
+	if ui.AnswerButton1 then
+		ui.AnswerButton1.Visible = button1Text ~= nil
+		setButtonText(ui.AnswerButton1, button1Text or "")
+	end
+
+	if ui.AnswerButton2 then
+		ui.AnswerButton2.Visible = button2Text ~= nil
+		setButtonText(ui.AnswerButton2, button2Text or "")
+	end
+end
+
+local function hideAnswerButtons()
+	answer1Action = nil
+	answer2Action = nil
+
+	if ui.AnswerButton1 then
+		ui.AnswerButton1.Visible = false
+	end
+
+	if ui.AnswerButton2 then
+		ui.AnswerButton2.Visible = false
+	end
+end
+
+local function typeDialogText(fullText, onComplete)
+	dialogToken += 1
+	local token = dialogToken
+	hideAnswerButtons()
+
+	if not ui.DialogText then
+		if onComplete then
+			onComplete()
+		end
+		return
+	end
+
+	ui.DialogText.Text = ""
+	task.spawn(function()
+		for index = 1, utf8.len(fullText) do
+			if token ~= dialogToken then
+				return
+			end
+
+			local byteIndex = utf8.offset(fullText, index + 1)
+			ui.DialogText.Text = byteIndex and string.sub(fullText, 1, byteIndex - 1) or fullText
+			local char = string.sub(ui.DialogText.Text, -1)
+			local pause = TYPEWRITER_SECONDS_PER_CHAR
+
+			if char == "." or char == "," or char == "!" or char == "?" or char == "—" then
+				pause += 0.08
+			end
+
+			task.wait(pause)
+		end
+
+		if token ~= dialogToken then
+			return
+		end
+
+		ui.DialogText.Text = fullText
+
+		if onComplete then
+			onComplete()
+		end
+	end)
+end
+
+local function playIntroOverlay()
+	if not ui.IntroOverlay or not ui.DarkFade or not ui.MistFade then
+		return
+	end
+
+	ui.IntroOverlay.Visible = true
+	ui.DarkFade.BackgroundTransparency = 0
+	ui.DarkFade.ImageTransparency = hasCustomAssetId(ui.DarkFade.Image) and 0.2 or 1
+	ui.MistFade.ImageTransparency = hasCustomAssetId(ui.MistFade.Image) and 0.15 or 1
+	ui.MistFade.BackgroundTransparency = hasCustomAssetId(ui.MistFade.Image) and 1 or 0.55
+
+	TweenService:Create(ui.DarkFade, TweenInfo.new(0.42, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		BackgroundTransparency = 1,
+		ImageTransparency = 1,
+	}):Play()
+
+	task.delay(0.12, function()
+		TweenService:Create(ui.MistFade, TweenInfo.new(0.58, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundTransparency = 1,
+			ImageTransparency = 1,
+		}):Play()
+	end)
+
+	task.delay(0.72, function()
+		if ui.IntroOverlay then
+			ui.IntroOverlay.Visible = false
+		end
+	end)
 end
 
 local function setPackTraderVisible(isVisible)
@@ -278,21 +475,11 @@ local function setPackTraderVisible(isVisible)
 	end
 
 	if isVisible then
+		ui.PackTraderFrame.Position = baseLayout.PackTraderOpenPosition or ui.PackTraderFrame.Position
 		ui.PackTraderFrame.Visible = true
-		ui.PackTraderFrame.Position = getHiddenRightPosition(ui.PackTraderFrame, baseLayout.PackTraderOpenPosition or ui.PackTraderFrame.Position)
-		TweenService:Create(ui.PackTraderFrame, TWEEN_IN, {
-			Position = baseLayout.PackTraderOpenPosition or ui.PackTraderFrame.Position,
-		}):Play()
 	else
-		TweenService:Create(ui.PackTraderFrame, TWEEN_OUT, {
-			Position = getHiddenRightPosition(ui.PackTraderFrame, baseLayout.PackTraderOpenPosition or ui.PackTraderFrame.Position),
-		}):Play()
-		task.delay(0.15, function()
-			if ui.PackTraderFrame then
-				ui.PackTraderFrame.Visible = false
-				ui.PackTraderFrame.Position = baseLayout.PackTraderOpenPosition or ui.PackTraderFrame.Position
-			end
-		end)
+		ui.PackTraderFrame.Visible = false
+		ui.PackTraderFrame.Position = baseLayout.PackTraderOpenPosition or ui.PackTraderFrame.Position
 	end
 end
 
@@ -312,61 +499,88 @@ local function closeItemInfoPanel()
 	end)
 end
 
-local function showDialog()
-	if ui.DialogText then
-		ui.DialogText.Text = DIALOG_DEFAULT_TEXT
+local function showDialogPanel()
+	if not ui.DialogPanel then
+		return
 	end
 
-	if ui.DialogPanel then
-		ui.DialogPanel.Visible = true
-		ui.DialogPanel.Position = getHiddenRightPosition(ui.DialogPanel, baseLayout.DialogOpenPosition or ui.DialogPanel.Position)
-		TweenService:Create(ui.DialogPanel, TWEEN_IN, {
-			Position = baseLayout.DialogOpenPosition or ui.DialogPanel.Position,
-		}):Play()
-	end
-
-	if ui.OffersPanel then
-		ui.OffersPanel.Visible = false
-		ui.OffersPanel.Position = baseLayout.OffersOpenPosition or ui.OffersPanel.Position
-	end
+	ui.DialogPanel.Visible = true
+	ui.DialogPanel.Position = getHiddenRightPosition(ui.DialogPanel, baseLayout.DialogOpenPosition or ui.DialogPanel.Position)
+	TweenService:Create(ui.DialogPanel, TWEEN_IN, {
+		Position = baseLayout.DialogOpenPosition or ui.DialogPanel.Position,
+	}):Play()
 end
 
-local function showOffers()
-	if ui.DialogPanel then
-		ui.DialogPanel.Visible = false
-		ui.DialogPanel.Position = baseLayout.DialogOpenPosition or ui.DialogPanel.Position
+local function hideDialogPanel()
+	if not ui.DialogPanel then
+		return
 	end
 
-	if ui.OffersPanel then
-		ui.OffersPanel.Visible = true
-		ui.OffersPanel.Position = getHiddenRightPosition(ui.OffersPanel, baseLayout.OffersOpenPosition or ui.OffersPanel.Position)
-		TweenService:Create(ui.OffersPanel, TWEEN_IN, {
-			Position = baseLayout.OffersOpenPosition or ui.OffersPanel.Position,
-		}):Play()
-	end
+	ui.DialogPanel.Visible = false
+	ui.DialogPanel.Position = baseLayout.DialogOpenPosition or ui.DialogPanel.Position
 end
 
-local function openPackTrader()
-	closeItemInfoPanel()
-
-	if ui.ItemsScroll then
-		ui.ItemsScroll.Visible = false
+local function showOffersPanel()
+	if not ui.OffersPanel then
+		return
 	end
 
-	if ui.PassivesScroll then
-		ui.PassivesScroll.Visible = false
-	end
-
-	setPackTraderVisible(true)
-	showDialog()
-	packTraderActionRemote:FireServer({
-		Action = "RequestSync",
-	})
+	ui.OffersPanel.Visible = true
+	ui.OffersPanel.Position = getHiddenRightPosition(ui.OffersPanel, baseLayout.OffersOpenPosition or ui.OffersPanel.Position)
+	TweenService:Create(ui.OffersPanel, TWEEN_IN, {
+		Position = baseLayout.OffersOpenPosition or ui.OffersPanel.Position,
+	}):Play()
 end
 
-local function closePackTrader()
-	if ui.PackTraderFrame and ui.PackTraderFrame.Visible then
-		setPackTraderVisible(false)
+local function hideOffersPanel()
+	if not ui.OffersPanel then
+		return
+	end
+
+	ui.OffersPanel.Visible = false
+	ui.OffersPanel.Position = baseLayout.OffersOpenPosition or ui.OffersPanel.Position
+end
+
+local showGreeting
+local showOffers
+local showSpecialDialog
+
+showGreeting = function()
+	latestDialogState = "Greeting"
+	setTraderImage("Greeting")
+	hideOffersPanel()
+	showDialogPanel()
+	local rarity = latestOffer and (latestOffer.Rarity or getOfferRarity(latestOffer.TotalItemAmount)) or "Необычными"
+	local text = "Здравствуй, странник, я торгую разными товарами, сегодня — " .. rarity .. " товарами."
+	typeDialogText(text, function()
+		showAnswerButtons("Покажи свои товары", showOffers, "Пока просто смотрю", function()
+			typeDialogText("Смотри, сколько хочешь.", function()
+				task.delay(0.15, showOffers)
+			end)
+		end)
+	end)
+end
+
+showSpecialDialog = function(state)
+	latestDialogState = state
+	hideOffersPanel()
+	showDialogPanel()
+	setTraderImage(state)
+
+	if state == "Suspicious" then
+		typeDialogText("ТЫ какой-то подозрительный.. Уходи и не путайся под ногами.", function()
+			showAnswerButtons("Понял, извините", function()
+				packTraderActionRemote:FireServer({ Action = "ClearSpecialState" })
+				showGreeting()
+			end)
+		end)
+	elseif state == "Angry" then
+		typeDialogText("Если нету денег — проваливай.", function()
+			showAnswerButtons("Просто мелочевки нету..", function()
+				packTraderActionRemote:FireServer({ Action = "ClearSpecialState" })
+				showGreeting()
+			end)
+		end)
 	end
 end
 
@@ -455,12 +669,33 @@ local function updateOfferText(offer)
 		return
 	end
 
+	if ui.OfferTimerText then
+		ui.OfferTimerText.Text = "Обновление через: " .. formatRemaining(offer.Remaining or ((offer.ExpiresAt or os.time()) - os.time()))
+	end
+
+	if offer.Purchased then
+		if ui.OfferTitleText then
+			ui.OfferTitleText.Text = "Товары закончились"
+		end
+		if ui.OfferPriceText then
+			ui.OfferPriceText.Text = "Подожди обновления магазина."
+		end
+		if ui.BuyOfferButton then
+			ui.BuyOfferButton.Visible = false
+		end
+		return
+	end
+
+	if ui.OfferTitleText then
+		ui.OfferTitleText.Text = "Сегодня могу предложить:"
+	end
+
 	if ui.OfferPriceText then
 		ui.OfferPriceText.Text = "Цена: " .. FormatNumber(offer.Price or 0) .. " Coins"
 	end
 
-	if ui.OfferTimerText then
-		ui.OfferTimerText.Text = "Обновление через: " .. formatRemaining(offer.Remaining or ((offer.ExpiresAt or os.time()) - os.time()))
+	if ui.BuyOfferButton then
+		ui.BuyOfferButton.Visible = true
 	end
 end
 
@@ -468,6 +703,40 @@ local function updateOffer(offer)
 	latestOffer = offer
 	updateOfferText(offer)
 	updateOfferSlots(offer)
+end
+
+showOffers = function()
+	latestDialogState = latestOffer and latestOffer.Purchased and "SoldOut" or "Offers"
+	setTraderImage("Offers")
+	hideDialogPanel()
+	updateOffer(latestOffer)
+	showOffersPanel()
+end
+
+local function openPackTrader()
+	closeItemInfoPanel()
+
+	if ui.ItemsScroll then
+		ui.ItemsScroll.Visible = false
+	end
+
+	if ui.PassivesScroll then
+		ui.PassivesScroll.Visible = false
+	end
+
+	setPackTraderVisible(true)
+	showGreeting()
+	if not introPlayedForInventoryOpen then
+		playIntroOverlay()
+		introPlayedForInventoryOpen = true
+	end
+	packTraderActionRemote:FireServer({ Action = "OpenTrader" })
+end
+
+local function closePackTrader()
+	if ui.PackTraderFrame and ui.PackTraderFrame.Visible then
+		setPackTraderVisible(false)
+	end
 end
 
 local function hookButtons()
@@ -482,31 +751,28 @@ local function hookButtons()
 	end
 
 	if ui.AnswerButton1 and ui.AnswerButton1:IsA("GuiButton") then
-		ui.AnswerButton1.MouseButton1Click:Connect(showOffers)
+		ui.AnswerButton1.MouseButton1Click:Connect(function()
+			if answer1Action then
+				answer1Action()
+			end
+		end)
 	end
 
 	if ui.AnswerButton2 and ui.AnswerButton2:IsA("GuiButton") then
 		ui.AnswerButton2.MouseButton1Click:Connect(function()
-			if ui.DialogText then
-				ui.DialogText.Text = DIALOG_NO_TEXT
-				task.delay(1.2, function()
-					if ui.DialogText then
-						ui.DialogText.Text = DIALOG_DEFAULT_TEXT
-					end
-				end)
+			if answer2Action then
+				answer2Action()
 			end
 		end)
 	end
 
 	if ui.BackToDialogButton and ui.BackToDialogButton:IsA("GuiButton") then
-		ui.BackToDialogButton.MouseButton1Click:Connect(showDialog)
+		ui.BackToDialogButton.MouseButton1Click:Connect(showGreeting)
 	end
 
 	if ui.BuyOfferButton and ui.BuyOfferButton:IsA("GuiButton") then
 		ui.BuyOfferButton.MouseButton1Click:Connect(function()
-			packTraderActionRemote:FireServer({
-				Action = "BuyOffer",
-			})
+			packTraderActionRemote:FireServer({ Action = "BuyOffer" })
 		end)
 	end
 
@@ -550,23 +816,19 @@ local function updateTimerLoop()
 				latestOffer.Remaining = math.max(0, (latestOffer.ExpiresAt or os.time()) - os.time())
 				updateOfferText(latestOffer)
 			end
+
+			if ui.InventoryMain and lastInventoryVisible ~= ui.InventoryMain.Visible then
+				lastInventoryVisible = ui.InventoryMain.Visible
+				if not lastInventoryVisible then
+					introPlayedForInventoryOpen = false
+				end
+			end
 			task.wait(1)
 		end
 	end)
 end
 
-cacheGui()
-task.wait()
-captureBaseLayout()
-applyAssets()
-applyTextStyles()
-if ui.PackTraderFrame then
-	ui.PackTraderFrame.Visible = false
-end
-hookButtons()
-updateTimerLoop()
-
-syncPackTraderRemote.OnClientEvent:Connect(function(payload)
+local function handleSync(payload)
 	if type(payload) ~= "table" then
 		return
 	end
@@ -575,19 +837,42 @@ syncPackTraderRemote.OnClientEvent:Connect(function(payload)
 		updateOffer(payload.Offer)
 	end
 
-	if payload.Message and ui.DialogText and payload.ResultType == "NotEnough" then
-		ui.DialogText.Text = payload.Message
-		task.delay(1.2, function()
-			if ui.DialogText then
-				ui.DialogText.Text = DIALOG_DEFAULT_TEXT
-			end
-		end)
+	if payload.ResultType and payload.Message then
+		notify(payload.ResultType, payload.Message)
 	end
-end)
 
-packTraderActionRemote:FireServer({
-	Action = "RequestSync",
-})
+	if not (ui.PackTraderFrame and ui.PackTraderFrame.Visible) then
+		return
+	end
+
+	if payload.DialogState == "Suspicious" and latestDialogState ~= "Suspicious" then
+		showSpecialDialog("Suspicious")
+	elseif payload.DialogState == "Angry" and latestDialogState ~= "Angry" then
+		showSpecialDialog("Angry")
+	elseif payload.DialogState == "SoldOut" and latestDialogState ~= "SoldOut" then
+		showOffers()
+	elseif payload.DialogState == "Greeting" and latestDialogState ~= "Greeting" then
+		showGreeting()
+	end
+end
+
+cacheGui()
+ensureIntroOverlay()
+task.wait()
+captureBaseLayout()
+applyAssets()
+applyTextStyles()
+setTraderImage("Greeting")
+hideAnswerButtons()
+if ui.PackTraderFrame then
+	ui.PackTraderFrame.Visible = false
+end
+hookButtons()
+updateTimerLoop()
+
+syncPackTraderRemote.OnClientEvent:Connect(handleSync)
+
+packTraderActionRemote:FireServer({ Action = "RequestSync" })
 
 local camera = Workspace.CurrentCamera
 if camera then

@@ -5,6 +5,12 @@ local ASSETS = {
 
 	TraderBackground = "rbxassetid://0",
 	TraderImage = "rbxassetid://0",
+	NormalTraderImage = "rbxassetid://0",
+	SuspiciousTraderImage = "rbxassetid://0",
+	AngryTraderImage = "rbxassetid://0",
+
+	DarkFadeImage = "rbxassetid://0",
+	MistFadeImage = "rbxassetid://0",
 
 	DialogBackground = "rbxassetid://0",
 	AnswerButtonBackground = "rbxassetid://0",
@@ -101,6 +107,37 @@ traderImage.BackgroundTransparency = 1
 setImageIfEmpty(traderImage, ASSETS.TraderImage)
 traderImage.ScaleType = Enum.ScaleType.Fit
 traderImage.ZIndex = 8
+
+local introOverlay = getOrCreate("Frame", packTraderFrame, "IntroOverlay")
+introOverlay.Visible = false
+introOverlay.Size = UDim2.fromScale(1, 1)
+introOverlay.Position = UDim2.fromScale(0, 0)
+introOverlay.BackgroundTransparency = 1
+introOverlay.ZIndex = 80
+
+local darkFade = getOrCreate("ImageLabel", introOverlay, "DarkFade")
+darkFade.Size = UDim2.fromScale(1, 1)
+darkFade.Position = UDim2.fromScale(0, 0)
+darkFade.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+darkFade.BackgroundTransparency = 0
+setImageIfEmpty(darkFade, ASSETS.DarkFadeImage)
+darkFade.ImageTransparency = 1
+darkFade.ScaleType = Enum.ScaleType.Stretch
+darkFade.ZIndex = 81
+
+local mistFade = getOrCreate("ImageLabel", introOverlay, "MistFade")
+mistFade.Size = UDim2.fromScale(1, 1)
+mistFade.Position = UDim2.fromScale(0, 0)
+mistFade.BackgroundTransparency = 1
+setImageIfEmpty(mistFade, ASSETS.MistFadeImage)
+mistFade.ImageTransparency = 1
+mistFade.ScaleType = Enum.ScaleType.Stretch
+mistFade.ZIndex = 82
+
+local traderNameText = getOrCreate("TextLabel", packTraderFrame, "TraderNameText")
+traderNameText.Position = traderNameText.Position == UDim2.new() and UDim2.fromScale(0.36, 0.02) or traderNameText.Position
+traderNameText.Size = traderNameText.Size == UDim2.new() and UDim2.fromScale(0.58, 0.07) or traderNameText.Size
+styleText(traderNameText, "Торговец", 20)
 
 local dialogPanel = getOrCreate("Frame", packTraderFrame, "DialogPanel")
 dialogPanel.Position = dialogPanel.Position == UDim2.new() and UDim2.fromScale(0.36, 0.10) or dialogPanel.Position

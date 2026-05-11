@@ -118,6 +118,20 @@ local UI_PROFILES = {
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local coinCollectedEffect = remotes:WaitForChild("CoinCollectedEffect")
+
+local function getOrCreateLocalNotificationEvent()
+	local event = ReplicatedStorage:FindFirstChild("LocalNotificationEvent")
+
+	if not event then
+		event = Instance.new("BindableEvent")
+		event.Name = "LocalNotificationEvent"
+		event.Parent = ReplicatedStorage
+	end
+
+	return event
+end
+
+local localNotificationEvent = getOrCreateLocalNotificationEvent()
 local buyUpgradeRemote = remotes:WaitForChild("BuyUpgrade")
 local upgradeResultRemote = remotes:WaitForChild("UpgradeResult")
 local syncPlayerDataRemote = remotes:WaitForChild("SyncPlayerData")
@@ -605,6 +619,10 @@ local function showNotification(notificationType, message)
 		outTween:Play()
 	end)
 end
+
+localNotificationEvent.Event:Connect(function(notificationType, message)
+	showNotification(notificationType or "Error", message or "Ошибка")
+end)
 
 local function createText(parent, name, textValue, position, size, font, color)
 	local text = Instance.new("TextLabel")
