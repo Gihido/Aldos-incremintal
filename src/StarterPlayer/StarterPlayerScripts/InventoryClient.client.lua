@@ -34,17 +34,17 @@ local UI_PROFILES = {
 	},
 
 	Mobile = {
-		InventoryScale = 0.56,
-		ToggleScale = 0.68,
-		TooltipScale = 0.68,
-		BuffsScale = 0.60,
+		InventoryScale = 0.50,
+		ToggleScale = 0.64,
+		TooltipScale = 0.64,
+		BuffsScale = 0.58,
 	},
 
 	SmallMobile = {
-		InventoryScale = 0.48,
-		ToggleScale = 0.60,
-		TooltipScale = 0.60,
-		BuffsScale = 0.52,
+		InventoryScale = 0.42,
+		ToggleScale = 0.56,
+		TooltipScale = 0.56,
+		BuffsScale = 0.50,
 	},
 }
 
@@ -194,18 +194,56 @@ local function applyTextConstraint(textObject, minSize, maxSize)
 end
 
 local TEXT_SIZE_RULES = {
-	InventoryTitle = { 22, 48 },
-	ItemName = { 14, 30 },
-	ItemCount = { 14, 30 },
-	InfoName = { 22, 44 },
-	InfoCount = { 16, 34 },
-	InfoBoost = { 16, 34 },
-	InfoDescription = { 14, 30 },
-	ButtonText = { 16, 34 },
-	TooltipName = { 18, 36 },
-	TooltipBoost = { 15, 30 },
-	BuffTime = { 14, 28 },
+	InventoryTitle = { Min = 22, Desktop = 48, Mobile = 34, SmallMobile = 28 },
+	ItemName = { Min = 12, Desktop = 28, Mobile = 18, SmallMobile = 15 },
+	ItemCount = { Min = 12, Desktop = 24, Mobile = 16, SmallMobile = 14 },
+	InfoName = { Min = 14, Desktop = 34, Mobile = 22, SmallMobile = 18 },
+	InfoCount = { Min = 12, Desktop = 28, Mobile = 18, SmallMobile = 15 },
+	InfoBoost = { Min = 12, Desktop = 28, Mobile = 18, SmallMobile = 15 },
+	InfoDescription = { Min = 11, Desktop = 26, Mobile = 16, SmallMobile = 14 },
+	ButtonText = { Min = 11, Desktop = 26, Mobile = 18, SmallMobile = 15 },
+	TooltipName = { Min = 12, Desktop = 30, Mobile = 18, SmallMobile = 15 },
+	TooltipBoost = { Min = 11, Desktop = 26, Mobile = 16, SmallMobile = 14 },
+	BuffTime = { Min = 10, Desktop = 22, Mobile = 14, SmallMobile = 12 },
+	ItemsEmptyLabel = { Min = 18, Desktop = 42, Mobile = 28, SmallMobile = 22 },
+	PassivesComingSoonLabel = { Min = 18, Desktop = 42, Mobile = 28, SmallMobile = 22 },
 }
+
+
+local getUIProfileName
+
+local function applyResponsiveTextConstraint(textObject, rule)
+	if not textObject or not (textObject:IsA("TextLabel") or textObject:IsA("TextButton") or textObject:IsA("TextBox")) then
+		return
+	end
+
+	local profileName = getUIProfileName and getUIProfileName() or "Desktop"
+	local maxTextSize = rule.Desktop
+
+	if profileName == "SmallMobile" then
+		maxTextSize = rule.SmallMobile or rule.Mobile or rule.Desktop
+	elseif profileName == "Mobile" then
+		maxTextSize = rule.Mobile or rule.Desktop
+	end
+
+	applyTextConstraint(textObject, rule.Min or 10, maxTextSize or rule.Desktop or 24)
+end
+
+local function applyResponsiveTextConstraints(root)
+	if not root then
+		return
+	end
+
+	for _, descendant in ipairs(root:GetDescendants()) do
+		local rule = TEXT_SIZE_RULES[descendant.Name]
+
+		if rule then
+			applyResponsiveTextConstraint(descendant, rule)
+		elseif ui.ActiveBuffsPanel and descendant:IsDescendantOf(ui.ActiveBuffsPanel) and (descendant:IsA("TextLabel") or descendant:IsA("TextButton") or descendant:IsA("TextBox")) then
+			applyResponsiveTextConstraint(descendant, { Min = 10, Desktop = 22, Mobile = 14, SmallMobile = 12 })
+		end
+	end
+end
 
 local function applyInventoryTextStyles(root)
 	if not root then
@@ -216,9 +254,9 @@ local function applyInventoryTextStyles(root)
 		local rule = TEXT_SIZE_RULES[descendant.Name]
 
 		if rule then
-			applyTextConstraint(descendant, rule[1], rule[2])
+			applyResponsiveTextConstraint(descendant, rule)
 		elseif ui.ActiveBuffsPanel and descendant:IsDescendantOf(ui.ActiveBuffsPanel) and (descendant:IsA("TextLabel") or descendant:IsA("TextButton") or descendant:IsA("TextBox")) then
-			applyTextConstraint(descendant, 14, 28)
+			applyResponsiveTextConstraint(descendant, { Min = 10, Desktop = 22, Mobile = 14, SmallMobile = 12 })
 		end
 	end
 end
@@ -310,7 +348,7 @@ local function isMobileDevice()
 	return false
 end
 
-local function getUIProfileName()
+getUIProfileName = function()
 	local viewport = getViewport()
 	local minSide = math.min(viewport.X, viewport.Y)
 
@@ -364,13 +402,23 @@ local function getInfoBackground(itemId)
 	return itemAssets.InfoBackground or getMainAssets().ItemInfoBackground
 end
 
-local function setIconFallbackLetter(icon, itemId)
+local function getActivateButtonBackground(itemId)
+	local itemAssets = getItemAssets(itemId)
+	return itemAssets.ActivateButtonBackground or getMainAssets().ActivateButtonBackground
+end
+
+local function getDeleteButtonBackground(itemId)
+	local itemAssets = getItemAssets(itemId)
+	return itemAssets.DeleteButtonBackground or getMainAssets().DeleteButtonBackground
+end
+
+local function setIconFallbackLetter(icon, itemId, forBuff)
 	if not icon then
 		return
 	end
 
 	local letter = icon:FindFirstChild("FallbackLetter")
-	local hasIcon = hasCustomAssetId(getItemIcon(itemId, false))
+	local hasIcon = hasCustomAssetId(icon.Image) or hasCustomAssetId(getItemIcon(itemId, forBuff == true))
 
 	if hasIcon then
 		if letter then
@@ -470,6 +518,7 @@ local function applyResponsiveMode()
 	print("[InventoryClient] Responsive applied:", profileName, viewport)
 	print("[InventoryClient] Viewport:", viewport.X, viewport.Y)
 	print("[InventoryClient] Touch:", UserInputService.TouchEnabled, "Keyboard:", UserInputService.KeyboardEnabled, "TenFoot:", GuiService:IsTenFootInterface())
+	applyResponsiveTextConstraints(gui)
 	print("[InventoryClient] Scales:", ui.InventoryScale and ui.InventoryScale.Scale or "missing", ui.ButtonScale and ui.ButtonScale.Scale or "missing", ui.TooltipScale and ui.TooltipScale.Scale or "missing", ui.BuffsScale and ui.BuffsScale.Scale or "missing")
 end
 
@@ -607,7 +656,7 @@ local function createEmptyStateLabel(parent, name, text)
 		label.AnchorPoint = Vector2.new(0.5, 0.5)
 		label.BackgroundTransparency = 1
 		label.Position = UDim2.fromScale(0.5, 0.5)
-		label.Size = UDim2.new(0.8, 0, 0, 80)
+		label.Size = UDim2.new(1, -40, 0, 90)
 		label.ZIndex = (parent:IsA("GuiObject") and parent.ZIndex or 1) + 2
 		label.Parent = parent
 	end
@@ -616,10 +665,12 @@ local function createEmptyStateLabel(parent, name, text)
 	label.Text = text
 	label.TextColor3 = Color3.fromRGB(255, 255, 255)
 	label.TextScaled = true
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	label.TextYAlignment = Enum.TextYAlignment.Center
 	label.TextStrokeColor3 = Color3.fromRGB(24, 24, 30)
 	label.TextStrokeTransparency = 0.2
 	label.TextWrapped = true
-	applyTextConstraint(label, 18, 36)
+	applyResponsiveTextConstraint(label, TEXT_SIZE_RULES[name] or { Min = 18, Desktop = 42, Mobile = 28, SmallMobile = 22 })
 
 	return label
 end
@@ -765,6 +816,20 @@ local function refreshItemInfo()
 	setText(ui.InfoCount, `Count: {getItemCount(selectedItemId)}`)
 	setText(ui.InfoBoost, definition.BoostText)
 	setText(ui.InfoDescription, definition.Description)
+	setImageOrFallback(ui.ActivateButton, getActivateButtonBackground(selectedItemId), Color3.fromRGB(55, 110, 55))
+	setImageOrFallback(ui.DeleteButton, getDeleteButtonBackground(selectedItemId), Color3.fromRGB(120, 50, 45))
+
+	for _, button in ipairs({ ui.ActivateButton, ui.DeleteButton }) do
+		local buttonText = button and button:FindFirstChild("ButtonText")
+		if buttonText and (buttonText:IsA("TextLabel") or buttonText:IsA("TextButton")) then
+			buttonText.BackgroundTransparency = 1
+			buttonText.Position = UDim2.fromScale(0, 0)
+			buttonText.Size = UDim2.fromScale(1, 1)
+			buttonText.TextXAlignment = Enum.TextXAlignment.Center
+			buttonText.TextYAlignment = Enum.TextYAlignment.Center
+			applyResponsiveTextConstraint(buttonText, TEXT_SIZE_RULES.ButtonText)
+		end
+	end
 
 	if ui.ActivateButton then
 		ui.ActivateButton.AutoButtonColor = getItemCount(selectedItemId) > 0
@@ -1023,33 +1088,35 @@ local function updateActiveBuffs(data)
 
 			setImageOrFallback(background, getMainAssets().BuffSlotBackground, Color3.fromRGB(28, 36, 48))
 			setImageOrFallback(icon, getItemIcon(buff.ItemId, true), Color3.fromRGB(40, 48, 56))
-			setIconFallbackLetter(icon, buff.ItemId)
+			setIconFallbackLetter(icon, buff.ItemId, true)
 
 			if icon and icon:IsA("GuiObject") then
 				icon.AnchorPoint = Vector2.new(0.5, 0.5)
-				icon.Position = UDim2.fromScale(0.5, 0.44)
-				icon.Size = UDim2.fromScale(0.72, 0.72)
+				icon.BackgroundTransparency = 1
+				icon.Position = UDim2.fromScale(0.5, 0.5)
+				icon.Size = UDim2.fromScale(1, 1)
+				if icon:IsA("ImageLabel") or icon:IsA("ImageButton") then
+					icon.ScaleType = Enum.ScaleType.Stretch
+				end
+			end
+
+			for _, textName in ipairs({ "BuffMultiplier", "BuffName", "BuffBoostText" }) do
+				local extraText = row:FindFirstChild(textName, true)
+				if extraText and (extraText:IsA("TextLabel") or extraText:IsA("TextButton")) then
+					extraText.Visible = false
+				end
 			end
 
 			if timeLabel and timeLabel:IsA("TextLabel") then
+				timeLabel.AnchorPoint = Vector2.new(0.5, 1)
+				timeLabel.BackgroundTransparency = 1
+				timeLabel.Position = UDim2.new(0.5, 0, 1, 4)
+				timeLabel.Size = UDim2.new(1, 0, 0, 22)
 				timeLabel.Text = formatRemaining(buff.Remaining or ((buff.EndTime or os.time()) - os.time()))
-				applyTextConstraint(timeLabel, 14, 28)
+				timeLabel.TextStrokeTransparency = 0.15
+				timeLabel.ZIndex = row.ZIndex + 4
+				applyResponsiveTextConstraint(timeLabel, TEXT_SIZE_RULES.BuffTime)
 			end
-
-			local multiplierLabel = row:FindFirstChild("BuffMultiplier")
-			if not multiplierLabel then
-				multiplierLabel = Instance.new("TextLabel")
-				multiplierLabel.Name = "BuffMultiplier"
-				multiplierLabel.BackgroundTransparency = 1
-				multiplierLabel.Position = UDim2.new(0, 0, 0, 0)
-				multiplierLabel.Size = UDim2.new(1, 0, 0, 20)
-				multiplierLabel.ZIndex = row.ZIndex + 2
-				multiplierLabel.Parent = row
-			end
-
-			multiplierLabel.Text = `x{string.format("%.2f", buff.CoinMultiplier or definition.CoinMultiplier or 1)}`
-			multiplierLabel.TextColor3 = Color3.fromRGB(255, 245, 170)
-			applyTextConstraint(multiplierLabel, 12, 24)
 
 			row.MouseEnter:Connect(function()
 				local mousePosition = UserInputService:GetMouseLocation()

@@ -8,20 +8,20 @@ ResponsiveUI.FORCE_MOBILE_IN_STUDIO = false
 
 local MOBILE_SCALES = {
 	SmallMobile = {
-		Inventory = 0.48,
-		Tooltip = 0.60,
-		BuffsPanel = 0.52,
-		ToggleButton = 0.60,
+		Inventory = 0.42,
+		Tooltip = 0.56,
+		BuffsPanel = 0.50,
+		ToggleButton = 0.56,
 		CoinPopup = 0.55,
 		AdminPanel = 0.50,
 		Notifications = 0.58,
 	},
 
 	Mobile = {
-		Inventory = 0.56,
-		Tooltip = 0.68,
-		BuffsPanel = 0.60,
-		ToggleButton = 0.68,
+		Inventory = 0.50,
+		Tooltip = 0.64,
+		BuffsPanel = 0.58,
+		ToggleButton = 0.64,
 		CoinPopup = 0.62,
 		AdminPanel = 0.58,
 		Notifications = 0.65,

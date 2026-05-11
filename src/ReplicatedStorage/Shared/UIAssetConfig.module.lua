@@ -128,6 +128,8 @@ local UIAssetConfig = {
 				TooltipBackground = "rbxassetid://0",
 				BuffTooltipBackground = "rbxassetid://0",
 				BuffIcon = "rbxassetid://0",
+				ActivateButtonBackground = "rbxassetid://0",
+				DeleteButtonBackground = "rbxassetid://0",
 			},
 
 			Cucumber = {
@@ -137,6 +139,8 @@ local UIAssetConfig = {
 				TooltipBackground = "rbxassetid://0",
 				BuffTooltipBackground = "rbxassetid://0",
 				BuffIcon = "rbxassetid://0",
+				ActivateButtonBackground = "rbxassetid://0",
+				DeleteButtonBackground = "rbxassetid://0",
 			},
 
 			Tomato = {
@@ -146,6 +150,8 @@ local UIAssetConfig = {
 				TooltipBackground = "rbxassetid://0",
 				BuffTooltipBackground = "rbxassetid://0",
 				BuffIcon = "rbxassetid://0",
+				ActivateButtonBackground = "rbxassetid://0",
+				DeleteButtonBackground = "rbxassetid://0",
 			},
 
 			Corn = {
@@ -155,6 +161,8 @@ local UIAssetConfig = {
 				TooltipBackground = "rbxassetid://0",
 				BuffTooltipBackground = "rbxassetid://0",
 				BuffIcon = "rbxassetid://0",
+				ActivateButtonBackground = "rbxassetid://0",
+				DeleteButtonBackground = "rbxassetid://0",
 			},
 		},
 	},
