@@ -111,7 +111,7 @@ end
 local function setVisualActive(active)
 	createCollectSquare()
 
-	squarePart.Transparency = active and 0.72 or 1
+	squarePart.Transparency = active and 0.55 or 1
 
 	if surfaceGui then
 		surfaceGui.Enabled = active
@@ -137,7 +137,7 @@ local function updateSquarePosition()
 
 	setVisualActive(true)
 	squarePart.Size = Vector3.new(currentSize, 0.05, currentSize)
-	squarePart.CFrame = CFrame.new(root.Position.X, root.Position.Y - 2.85, root.Position.Z)
+	squarePart.CFrame = CFrame.new(root.Position.X, root.Position.Y - 2.45, root.Position.Z)
 end
 
 local function setSquareVisible(visible, size)

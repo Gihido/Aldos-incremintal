@@ -15,7 +15,6 @@ local COLLECT_CHECK_SECONDS = 0.12
 local COLLECT_SQUARE_SIZE = 3
 local ZONE_EXIT_HYSTERESIS = 1
 local COIN_LAUNCH_SECONDS = 0.3
-local COIN_BACK_OFF_SECONDS = 0.2
 local START_CHASE_SPEED = 12
 local CHASE_ACCELERATION = 55
 local MAX_CHASE_SPEED = 90
@@ -24,6 +23,7 @@ local CHASE_TIMEOUT_SECONDS = 5
 local COIN_COLOR = Color3.fromRGB(135, 135, 135)
 local COIN_HIGHLIGHT_FILL = Color3.fromRGB(170, 170, 170)
 local COIN_HIGHLIGHT_OUTLINE = Color3.fromRGB(255, 255, 255)
+local RING_COLOR = Color3.fromRGB(235, 235, 235)
 
 local CoinService = {}
 
@@ -36,8 +36,19 @@ local fillLoopStarted = false
 local collectLoopStarted = false
 local playersInsideZone = {}
 local random = Random.new()
+local spawnCoin
+
+local function getPlayerRoot(player)
+	local character = player and player.Character
+
+	return character and character:FindFirstChild("HumanoidRootPart") or nil
+end
 
 local function getCoinParts(coin)
+	if not coin then
+		return {}
+	end
+
 	if coin:IsA("BasePart") then
 		return { coin }
 	end
@@ -56,6 +67,10 @@ local function getCoinParts(coin)
 end
 
 local function getCoinRootPart(coin)
+	if not coin then
+		return nil
+	end
+
 	if coin:IsA("BasePart") then
 		return coin
 	end
@@ -72,7 +87,19 @@ local function getCoinRootPart(coin)
 end
 
 local function getCoinCFrame(coin)
-	if coin:IsA("BasePart") then
+	if not coin then
+		return CFrame.new()
+	end
+
+	if coin:IsA("Model") then
+		local ok, pivot = pcall(function()
+			return coin:GetPivot()
+		end)
+
+		if ok and pivot then
+			return pivot
+		end
+	elseif coin:IsA("BasePart") then
 		return coin.CFrame
 	end
 
@@ -86,12 +113,20 @@ local function getCoinPosition(coin)
 end
 
 local function setCoinCFrame(coin, cframe)
-	if coin:IsA("BasePart") then
-		coin.CFrame = cframe
+	if not coin or not coin.Parent then
 		return
 	end
 
-	if not coin:IsA("Model") then
+	if coin:IsA("Model") then
+		local ok = pcall(function()
+			coin:PivotTo(cframe)
+		end)
+
+		if ok then
+			return
+		end
+	elseif coin:IsA("BasePart") then
+		coin.CFrame = cframe
 		return
 	end
 
@@ -107,45 +142,6 @@ local function setCoinCFrame(coin, cframe)
 		local partOffset = rootCFrame:ToObjectSpace(part.CFrame)
 		part.CFrame = cframe * partOffset
 	end
-end
-
-local function removeCoinGridDecor(coin)
-	for _, child in ipairs(coin:GetDescendants()) do
-		if string.find(child.Name, "GridLine") then
-			child:Destroy()
-		end
-	end
-end
-
-local function getRandomCoinCFrame()
-	local halfSize = zonePart.Size * 0.5
-	local x = random:NextNumber(-halfSize.X, halfSize.X)
-	local z = random:NextNumber(-halfSize.Z, halfSize.Z)
-	local y = halfSize.Y + 1.5
-
-	return zonePart.CFrame * CFrame.new(x, y, z)
-end
-
-local function styleCoin(coin)
-	coin:SetAttribute("IsCoin", true)
-	coin:SetAttribute("Collected", false)
-
-	for _, part in ipairs(getCoinParts(coin)) do
-		part.Anchored = true
-		part.CanCollide = false
-		part.CanTouch = false
-		part.Material = Enum.Material.Neon
-		part.Color = COIN_COLOR
-	end
-
-	local highlight = Instance.new("Highlight")
-	highlight.Name = "CoinHighlight"
-	highlight.FillTransparency = 0.65
-	highlight.OutlineTransparency = 0
-	highlight.FillColor = COIN_HIGHLIGHT_FILL
-	highlight.OutlineColor = COIN_HIGHLIGHT_OUTLINE
-	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	highlight.Parent = coin
 end
 
 local function removeActiveCoin(coin)
@@ -166,43 +162,16 @@ local function getActiveCoinCount()
 	return activeCount
 end
 
-local function getServerMaxActiveCoins()
-	if type(UpgradeService.GetServerMaxActiveCoins) ~= "function" then
-		warn("UpgradeService.GetServerMaxActiveCoins is not available; using fallback max coins")
-		return 0
+local function cleanupOldCoinDecor(coin)
+	if not coin then
+		return
 	end
 
-	return UpgradeService.GetServerMaxActiveCoins()
-end
-
-local function getCoinsPerPickup(player)
-	if type(UpgradeService.GetCoinsPerPickup) ~= "function" then
-		warn("UpgradeService.GetCoinsPerPickup is not available; using fallback pickup amount")
-		return 1
+	for _, child in ipairs(coin:GetDescendants()) do
+		if string.find(child.Name, "GridLine") or string.find(child.Name, "BaseplateLine") then
+			child:Destroy()
+		end
 	end
-
-	return UpgradeService.GetCoinsPerPickup(player)
-end
-
-local function awardCoins(player, amount)
-	if type(DataService.AddCoins) ~= "function" then
-		warn("DataService.AddCoins is not available; coin award skipped")
-		return nil
-	end
-
-	return DataService.AddCoins(player, amount)
-end
-
-local function syncPlayer(player)
-	if type(UpgradeService.SyncPlayer) == "function" then
-		UpgradeService.SyncPlayer(player)
-	end
-end
-
-local function getPlayerRoot(player)
-	local character = player.Character
-
-	return character and character:FindFirstChild("HumanoidRootPart") or nil
 end
 
 local function isPlayerInsideZone(player)
@@ -253,22 +222,49 @@ local function isCoinInsideCollectSquare(player, coin)
 		and math.abs(coinPosition.Y - root.Position.Y) <= 12
 end
 
-local function createParticleBurst(parent, name, color, emitCount, lifetimeMin, lifetimeMax, speedMin, speedMax)
-	if not parent then
+local function createCoinLaunchRingEffect(coin)
+	local coinPosition = getCoinPosition(coin)
+	local ring = Instance.new("Part")
+	ring.Name = "CoinLaunchRing"
+	ring.Anchored = true
+	ring.CanCollide = false
+	ring.CanQuery = false
+	ring.CanTouch = false
+	ring.CastShadow = false
+	ring.Color = RING_COLOR
+	ring.Material = Enum.Material.Neon
+	ring.Shape = Enum.PartType.Cylinder
+	ring.Size = Vector3.new(0.08, 0.35, 0.35)
+	ring.Transparency = 0.35
+	ring.CFrame = CFrame.new(coinPosition - Vector3.new(0, 0.25, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	ring.Parent = Workspace
+
+	local tween = TweenService:Create(ring, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = Vector3.new(0.08, 4.5, 4.5),
+		Transparency = 1,
+	})
+	tween:Play()
+	Debris:AddItem(ring, 0.6)
+end
+
+local function createWhiteCoinImpact(player)
+	local root = getPlayerRoot(player)
+
+	if not root then
 		return
 	end
 
 	local attachment = Instance.new("Attachment")
-	attachment.Name = name
-	attachment.Parent = parent
+	attachment.Name = "CoinImpactEffect"
+	attachment.Parent = root
 
 	local emitter = Instance.new("ParticleEmitter")
-	emitter.Name = name .. "Emitter"
-	emitter.Color = ColorSequence.new(color)
+	emitter.Name = "CoinImpactEffectEmitter"
+	emitter.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
 	emitter.LightEmission = 0.75
-	emitter.Lifetime = NumberRange.new(lifetimeMin, lifetimeMax)
+	emitter.Lifetime = NumberRange.new(0.22, 0.45)
 	emitter.Rate = 0
-	emitter.Speed = NumberRange.new(speedMin, speedMax)
+	emitter.Speed = NumberRange.new(6, 12)
 	emitter.SpreadAngle = Vector2.new(360, 360)
 	emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
 	emitter.Transparency = NumberSequence.new({
@@ -276,37 +272,70 @@ local function createParticleBurst(parent, name, color, emitCount, lifetimeMin, 
 		NumberSequenceKeypoint.new(1, 1),
 	})
 	emitter.Parent = attachment
-	emitter:Emit(emitCount)
+	emitter:Emit(22)
 
-	Debris:AddItem(attachment, lifetimeMax + 0.4)
+	Debris:AddItem(attachment, 0.9)
 end
 
-local function createCoinLaunchEffect(coin)
-	createParticleBurst(getCoinRootPart(coin), "CoinLaunchEffect", Color3.fromRGB(235, 235, 235), 10, 0.18, 0.35, 3, 8)
-end
-
-local function createWhiteCoinImpact(player)
-	createParticleBurst(getPlayerRoot(player), "CoinImpactEffect", Color3.fromRGB(255, 255, 255), 22, 0.22, 0.45, 6, 12)
-end
-
-local function cleanupCollectedCoin(coin)
-	removeActiveCoin(coin)
-
-	if coin.Parent then
-		coin:Destroy()
+local function getServerMaxActiveCoins()
+	if type(UpgradeService.GetServerMaxActiveCoins) ~= "function" then
+		warn("UpgradeService.GetServerMaxActiveCoins is not available; using fallback max coins")
+		return 10
 	end
 
+	return UpgradeService.GetServerMaxActiveCoins()
+end
+
+local function getCoinsPerPickup(player)
+	if type(UpgradeService.GetCoinsPerPickup) ~= "function" then
+		warn("UpgradeService.GetCoinsPerPickup is not available; using fallback pickup amount")
+		return 1
+	end
+
+	return UpgradeService.GetCoinsPerPickup(player)
+end
+
+local function awardCoinsToPlayer(player, amount)
+	if type(DataService.AddCoins) ~= "function" then
+		warn("DataService.AddCoins is not available; coin award skipped")
+		return nil
+	end
+
+	return DataService.AddCoins(player, amount)
+end
+
+local function syncPlayer(player)
+	if type(UpgradeService.SyncPlayer) == "function" then
+		UpgradeService.SyncPlayer(player)
+	end
+end
+
+local function scheduleCoinRespawn()
 	task.delay(RESPAWN_SECONDS, function()
-		CoinService.FillCoinsToLimit()
+		if spawnCoin then
+			spawnCoin()
+		end
 	end)
 end
 
+local function cancelCollectedCoin(coin)
+	if coin then
+		removeActiveCoin(coin)
+
+		if coin.Parent then
+			coin:Destroy()
+		end
+	end
+
+	scheduleCoinRespawn()
+end
+
 local function finishCoinCollection(player, coin, amount)
-	if not coin.Parent then
+	if not coin or not coin.Parent then
 		return
 	end
 
-	local newCoinBalance = awardCoins(player, amount)
+	local newCoinBalance = awardCoinsToPlayer(player, amount)
 	local leaderstats = player:FindFirstChild("leaderstats")
 	local coins = leaderstats and leaderstats:FindFirstChild("Coins")
 
@@ -315,45 +344,68 @@ local function finishCoinCollection(player, coin, amount)
 	end
 
 	createWhiteCoinImpact(player)
-	coinCollectedEffect:FireClient(player, amount)
+
+	if coinCollectedEffect then
+		coinCollectedEffect:FireClient(player, amount)
+	end
+
 	syncPlayer(player)
-	cleanupCollectedCoin(coin)
+	removeActiveCoin(coin)
+	coin:Destroy()
+	scheduleCoinRespawn()
 end
 
-local function moveCoinToward(coin, targetCFrame, duration, easingStyle, easingDirection)
-	local startCFrame = getCoinCFrame(coin)
-	local elapsed = 0
-
-	while coin.Parent and elapsed < duration do
-		local deltaTime = RunService.Heartbeat:Wait()
-		elapsed = elapsed + deltaTime
-
-		local alpha = math.clamp(elapsed / duration, 0, 1)
-
-		if easingStyle == Enum.EasingStyle.Back then
-			alpha = 1 - ((1 - alpha) * (1 - alpha))
-		elseif easingStyle == Enum.EasingStyle.Quad and easingDirection == Enum.EasingDirection.Out then
-			alpha = 1 - ((1 - alpha) * (1 - alpha))
-		end
-
-		setCoinCFrame(coin, startCFrame:Lerp(targetCFrame, alpha))
-	end
-
-	if coin.Parent then
-		setCoinCFrame(coin, targetCFrame)
-	end
-end
-
-local function chaseCoinToPlayer(player, coin, amount)
-	local speed = START_CHASE_SPEED
+local function animateCoinToPosition(coin, targetPosition, duration)
 	local startedAt = os.clock()
-	local rotation = 0
+	local startCFrame = getCoinCFrame(coin)
+	local startPosition = startCFrame.Position
 
-	while coin.Parent do
-		local root = getPlayerRoot(player)
+	while coin and coin.Parent and os.clock() - startedAt < duration do
+		local alpha = math.clamp((os.clock() - startedAt) / duration, 0, 1)
+		local eased = 1 - ((1 - alpha) * (1 - alpha))
+		local position = startPosition:Lerp(targetPosition, eased)
+		setCoinCFrame(coin, CFrame.new(position))
+		RunService.Heartbeat:Wait()
+	end
+
+	if coin and coin.Parent then
+		setCoinCFrame(coin, CFrame.new(targetPosition))
+	end
+end
+
+local function runCoinChase(player, coin, amount)
+	local root = getPlayerRoot(player)
+
+	if not root then
+		cancelCollectedCoin(coin)
+		return
+	end
+
+	local startedAt = os.clock()
+	local speed = START_CHASE_SPEED
+	local rotation = 0
+	local startPosition = getCoinPosition(coin)
+	local awayDirection = startPosition - root.Position
+
+	if awayDirection.Magnitude < 0.1 then
+		awayDirection = Vector3.new(random:NextNumber() - 0.5, 0, random:NextNumber() - 0.5)
+	end
+
+	awayDirection = Vector3.new(awayDirection.X, 0, awayDirection.Z)
+
+	if awayDirection.Magnitude < 0.1 then
+		awayDirection = Vector3.new(1, 0, 0)
+	end
+
+	createCoinLaunchRingEffect(coin)
+	local liftPosition = startPosition + Vector3.new(0, 3, 0) + (awayDirection.Unit * 2)
+	animateCoinToPosition(coin, liftPosition, COIN_LAUNCH_SECONDS)
+
+	while coin and coin.Parent do
+		root = getPlayerRoot(player)
 
 		if not root then
-			cleanupCollectedCoin(coin)
+			cancelCollectedCoin(coin)
 			return
 		end
 
@@ -370,74 +422,35 @@ local function chaseCoinToPlayer(player, coin, amount)
 		local deltaTime = RunService.Heartbeat:Wait()
 		speed = math.min(MAX_CHASE_SPEED, speed + (CHASE_ACCELERATION * deltaTime))
 
-		if os.clock() - startedAt > CHASE_TIMEOUT_SECONDS and speed >= MAX_CHASE_SPEED then
-			setCoinCFrame(coin, CFrame.new(targetPosition))
-			finishCoinCollection(player, coin, amount)
-			return
+		if os.clock() - startedAt > CHASE_TIMEOUT_SECONDS then
+			speed = MAX_CHASE_SPEED
 		end
-	end)
 
-		if distance > 0.001 then
+		if direction.Magnitude > 0.001 then
 			local step = math.min(distance, speed * deltaTime)
 			local newPosition = currentPosition + (direction.Unit * step)
-			rotation = rotation + (deltaTime * speed * 0.2)
-			local chaseCFrame = CFrame.new(newPosition) * CFrame.Angles(0, rotation, 0)
-			setCoinCFrame(coin, chaseCFrame)
+			rotation = rotation + (deltaTime * 12)
+			local newCFrame = CFrame.new(newPosition) * CFrame.Angles(rotation, rotation * 0.7, rotation * 0.35)
+			setCoinCFrame(coin, newCFrame)
 		end
 	end
 end
 
 local function startCoinChasePlayer(player, coin, amount)
 	task.spawn(function()
-		if not coin.Parent then
-			return
+		local ok, err = pcall(function()
+			runCoinChase(player, coin, amount)
+		end)
+
+		if not ok then
+			warn("Coin chase failed:", err)
+			cancelCollectedCoin(coin)
 		end
-
-		local root = getPlayerRoot(player)
-
-		if not root then
-			cleanupCollectedCoin(coin)
-			return
-		end
-
-		createCoinLaunchEffect(coin)
-
-		local startCFrame = getCoinCFrame(coin)
-		local launchPosition = startCFrame.Position + Vector3.new(0, random:NextNumber(2, 4), 0)
-		moveCoinToward(coin, CFrame.new(launchPosition), COIN_LAUNCH_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
-		if not coin.Parent then
-			return
-		end
-
-		root = getPlayerRoot(player)
-
-		if not root then
-			cleanupCollectedCoin(coin)
-			return
-		end
-
-		local awayDirection = launchPosition - root.Position
-		awayDirection = Vector3.new(awayDirection.X, 0, awayDirection.Z)
-
-		if awayDirection.Magnitude < 0.1 then
-			awayDirection = Vector3.new(random:NextNumber(-1, 1), 0, random:NextNumber(-1, 1))
-		end
-
-		if awayDirection.Magnitude < 0.1 then
-			awayDirection = Vector3.new(1, 0, 0)
-		end
-
-		local sideDirection = Vector3.new(-awayDirection.Z, 0, awayDirection.X).Unit * random:NextNumber(-1.4, 1.4)
-		local backOffPosition = launchPosition + awayDirection.Unit * 2 + sideDirection
-		moveCoinToward(coin, CFrame.new(backOffPosition), COIN_BACK_OFF_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
-		chaseCoinToPlayer(player, coin, amount)
 	end)
 end
 
-local function collectCoin(player, coin)
-	if coin:GetAttribute("Collected") then
+local function tryCollectCoinForPlayer(player, coin)
+	if not coin or not coin.Parent or coin:GetAttribute("Collected") then
 		return
 	end
 
@@ -459,8 +472,45 @@ local function collectCoin(player, coin)
 	startCoinChasePlayer(player, coin, amount)
 end
 
+local function getRandomCoinCFrame()
+	local halfSize = zonePart.Size * 0.5
+	local x = random:NextNumber(-halfSize.X, halfSize.X)
+	local z = random:NextNumber(-halfSize.Z, halfSize.Z)
+	local y = halfSize.Y + 1.5
 
-local function spawnCoin()
+	return zonePart.CFrame * CFrame.new(x, y, z)
+end
+
+local function styleCoin(coin)
+	coin:SetAttribute("IsCoin", true)
+	coin:SetAttribute("Collected", false)
+
+	for _, part in ipairs(getCoinParts(coin)) do
+		part.Anchored = true
+		part.CanCollide = false
+		part.CanTouch = false
+		part.CanQuery = true
+		part.Material = Enum.Material.Neon
+		part.Color = COIN_COLOR
+	end
+
+	local oldHighlight = coin:FindFirstChild("CoinHighlight")
+
+	if oldHighlight then
+		oldHighlight:Destroy()
+	end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "CoinHighlight"
+	highlight.FillTransparency = 0.65
+	highlight.OutlineTransparency = 0
+	highlight.FillColor = COIN_HIGHLIGHT_FILL
+	highlight.OutlineColor = COIN_HIGHLIGHT_OUTLINE
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Parent = coin
+end
+
+spawnCoin = function()
 	if not coinTemplate or not zonePart then
 		return false
 	end
@@ -471,16 +521,19 @@ local function spawnCoin()
 
 	local coin = coinTemplate:Clone()
 	coin.Name = "Coin"
-	removeCoinGridDecor(coin)
+	cleanupOldCoinDecor(coin)
 	styleCoin(coin)
 	setCoinCFrame(coin, getRandomCoinCFrame())
 	coin.Parent = Workspace
 	activeCoins[coin] = true
 
-	local coinParts = getCoinParts(coin)
+	return math.abs(localPosition.X) <= halfSize.X + margin
+		and math.abs(localPosition.Y) <= halfSize.Y + 5
+		and math.abs(localPosition.Z) <= halfSize.Z + margin
+end
 
 	if #coinParts == 0 or not getCoinRootPart(coin) then
-		warn("Spawned coin has no BasePart to touch or animate")
+		warn("Spawned coin has no BasePart to collect or animate")
 		coin:Destroy()
 		removeActiveCoin(coin)
 		return false
@@ -528,7 +581,7 @@ local function startCollectLoop()
 				if isInside then
 					for coin in pairs(activeCoins) do
 						if coin.Parent and not coin:GetAttribute("Collected") and isCoinInsideCollectSquare(player, coin) then
-							collectCoin(player, coin)
+							tryCollectCoinForPlayer(player, coin)
 						end
 					end
 				end
