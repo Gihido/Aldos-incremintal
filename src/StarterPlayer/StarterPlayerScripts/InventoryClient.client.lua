@@ -23,6 +23,28 @@ local PRESS_STROKE = Color3.fromRGB(255, 255, 180)
 local TWEEN_FAST = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local TWEEN_PANEL_OPEN = TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local TWEEN_PANEL_CLOSE = TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+local RESPONSIVE_SCALES = {
+	Desktop = {
+		Inventory = 1,
+		ToggleButton = 1,
+		Tooltip = 1,
+		Buffs = 1,
+	},
+
+	Mobile = {
+		Inventory = 0.72,
+		ToggleButton = 0.82,
+		Tooltip = 0.82,
+		Buffs = 0.78,
+	},
+
+	SmallMobile = {
+		Inventory = 0.62,
+		ToggleButton = 0.75,
+		Tooltip = 0.75,
+		Buffs = 0.68,
+	},
+}
 
 local playerGui = player:WaitForChild("PlayerGui")
 local gui = playerGui:WaitForChild("InventoryGui", 10)
@@ -226,6 +248,48 @@ local function tweenScale(guiObject, scaleValue)
 	end
 end
 
+local function getOrCreateScale(parent, name)
+	if not parent or not parent:IsA("GuiObject") then
+		warnMissing(name)
+		return nil
+	end
+
+	local scale = parent:FindFirstChild(name)
+
+	if scale and not scale:IsA("UIScale") then
+		warn(`[InventoryClient] {name} exists but is not a UIScale`)
+		return nil
+	end
+
+	if not scale then
+		scale = Instance.new("UIScale")
+		scale.Name = name
+		scale.Scale = 1
+		scale.Parent = parent
+	end
+
+	return scale
+end
+
+local function getResponsiveProfile()
+	local camera = Workspace.CurrentCamera
+	local viewport = camera and camera.ViewportSize or Vector2.new(1920, 1080)
+	local minSide = math.min(viewport.X, viewport.Y)
+
+	if minSide <= 500 then
+		return "SmallMobile", viewport
+	elseif minSide <= 700 then
+		return "Mobile", viewport
+	else
+		return "Desktop", viewport
+	end
+end
+
+local function getCurrentResponsiveScales()
+	local profile = getResponsiveProfile()
+	return RESPONSIVE_SCALES[profile] or RESPONSIVE_SCALES.Desktop
+end
+
 local function getItemCount(itemId)
 	return (latestInventoryData.Items and latestInventoryData.Items[itemId]) or 0
 end
@@ -298,8 +362,8 @@ local function cacheGui()
 	ui.ItemTooltip = findChild(gui, "ItemTooltip")
 	ui.ActiveBuffsPanel = findChild(gui, "ActiveBuffsPanel")
 
-	ui.ButtonScale = findChild(ui.ToggleButton, "ButtonScale")
-	ui.InventoryScale = findChild(ui.InventoryMain, "InventoryScale")
+	ui.ButtonScale = getOrCreateScale(ui.ToggleButton, "ButtonScale")
+	ui.InventoryScale = getOrCreateScale(ui.InventoryMain, "InventoryScale")
 	ui.InventoryBackground = findChild(ui.InventoryMain, "InventoryBackground")
 	ui.CloseInventoryButton = findChild(ui.InventoryMain, "CloseInventoryButton")
 	ui.InventoryTitle = findChild(ui.InventoryMain, "InventoryTitle")
@@ -318,11 +382,11 @@ local function cacheGui()
 	ui.InfoDescription = findChild(ui.ItemInfoPanel, "InfoDescription")
 	ui.ActivateButton = findChild(ui.ItemInfoPanel, "ActivateButton")
 	ui.DeleteButton = findChild(ui.ItemInfoPanel, "DeleteButton")
-	ui.TooltipScale = findChild(ui.ItemTooltip, "TooltipScale")
+	ui.TooltipScale = getOrCreateScale(ui.ItemTooltip, "TooltipScale")
 	ui.TooltipBackground = findChild(ui.ItemTooltip, "TooltipBackground")
 	ui.TooltipName = findChild(ui.ItemTooltip, "TooltipName")
 	ui.TooltipBoost = findChild(ui.ItemTooltip, "TooltipBoost")
-	ui.BuffsScale = findChild(ui.ActiveBuffsPanel, "BuffsScale")
+	ui.BuffsScale = getOrCreateScale(ui.ActiveBuffsPanel, "BuffsScale")
 	ui.BuffsBackground = findChild(ui.ActiveBuffsPanel, "BuffsBackground")
 	ui.BuffsScroll = findChild(ui.ActiveBuffsPanel, "BuffsScroll")
 	ui.BuffTemplate = findChild(ui.BuffsScroll, "BuffTemplate")
@@ -342,22 +406,31 @@ local function applyInventoryAssets()
 	setImageOrFallback(ui.DeleteButton, mainAssets.DeleteButtonBackground, Color3.fromRGB(120, 50, 45))
 end
 
-local function updateResponsiveScale()
+local function applyResponsiveScales()
+	local profile, viewport = getResponsiveProfile()
+	local scales = RESPONSIVE_SCALES[profile] or RESPONSIVE_SCALES.Desktop
+
 	if ui.InventoryScale then
-		ui.InventoryScale.Scale = ResponsiveUI.GetMobileScale("Inventory")
-	end
-
-	if ui.TooltipScale then
-		ui.TooltipScale.Scale = ResponsiveUI.GetMobileScale("Tooltip")
-	end
-
-	if ui.BuffsScale then
-		ui.BuffsScale.Scale = ResponsiveUI.GetMobileScale("BuffsPanel")
+		ui.InventoryScale.Scale = scales.Inventory
 	end
 
 	if ui.ButtonScale then
-		ui.ButtonScale.Scale = ResponsiveUI.GetMobileScale("ToggleButton")
+		ui.ButtonScale.Scale = scales.ToggleButton
 	end
+
+	if ui.TooltipScale then
+		ui.TooltipScale.Scale = scales.Tooltip
+	end
+
+	if ui.BuffsScale then
+		ui.BuffsScale.Scale = scales.Buffs
+	end
+
+	print("[InventoryClient] Responsive profile:", profile, "Viewport:", viewport)
+	print("[InventoryClient] InventoryScale:", ui.InventoryScale and ui.InventoryScale.Scale or "missing")
+	print("[InventoryClient] ButtonScale:", ui.ButtonScale and ui.ButtonScale.Scale or "missing")
+	print("[InventoryClient] TooltipScale:", ui.TooltipScale and ui.TooltipScale.Scale or "missing")
+	print("[InventoryClient] BuffsScale:", ui.BuffsScale and ui.BuffsScale.Scale or "missing")
 end
 
 local function ensureCloseInfoButtonVisible()
@@ -481,6 +554,73 @@ local function tweenInventoryContent(compressed)
 	end
 end
 
+local function createEmptyStateLabel(parent, name, text)
+	if not parent then
+		return nil
+	end
+
+	local label = parent:FindFirstChild(name)
+
+	if not label then
+		label = Instance.new("TextLabel")
+		label.Name = name
+		label.AnchorPoint = Vector2.new(0.5, 0.5)
+		label.BackgroundTransparency = 1
+		label.Position = UDim2.fromScale(0.5, 0.5)
+		label.Size = UDim2.new(0.8, 0, 0, 80)
+		label.ZIndex = (parent:IsA("GuiObject") and parent.ZIndex or 1) + 2
+		label.Parent = parent
+	end
+
+	label.Font = getGameFont()
+	label.Text = text
+	label.TextColor3 = Color3.fromRGB(255, 255, 255)
+	label.TextScaled = true
+	label.TextStrokeColor3 = Color3.fromRGB(24, 24, 30)
+	label.TextStrokeTransparency = 0.2
+	label.TextWrapped = true
+	applyTextConstraint(label, 18, 36)
+
+	return label
+end
+
+local function setupEmptyStateLabels()
+	ui.ItemsEmptyLabel = createEmptyStateLabel(ui.ItemsScroll or ui.InventoryContent, "ItemsEmptyLabel", "Инвентарь пуст")
+	ui.PassivesComingSoonLabel = createEmptyStateLabel(ui.PassivesScroll or ui.InventoryContent, "PassivesComingSoonLabel", "Пассивы скоро будут")
+
+	if ui.ItemsEmptyLabel then
+		ui.ItemsEmptyLabel.Visible = false
+	end
+
+	if ui.PassivesComingSoonLabel then
+		ui.PassivesComingSoonLabel.Visible = false
+	end
+end
+
+local function countVisibleInventoryItems()
+	local count = 0
+
+	for _, itemId in ipairs(INVENTORY_ITEMS) do
+		if getItemCount(itemId) > 0 then
+			count += 1
+		end
+	end
+
+	return count
+end
+
+local function updateEmptyStateLabels(visibleItemCount)
+	local hasItems = (visibleItemCount or countVisibleInventoryItems()) > 0
+
+	if ui.ItemsEmptyLabel then
+		ui.ItemsEmptyLabel.Visible = currentTab == "Items" and not hasItems
+	end
+
+	if ui.PassivesComingSoonLabel then
+		ui.PassivesComingSoonLabel.Visible = currentTab == "Passives"
+	end
+end
+
 local function setSlotSelected(slot, selected)
 	local hovered = slot and slotHoverStates[slot]
 	local color = selected and SELECTED_STROKE or (hovered and HOVER_STROKE or FALLBACK_STROKE)
@@ -539,6 +679,11 @@ local function updateAllSlots()
 	for _, itemId in ipairs(INVENTORY_ITEMS) do
 		visibleIndex = updateSlot(itemId, visibleIndex)
 	end
+
+	local visibleItemCount = visibleIndex - 1
+	updateEmptyStateLabels(visibleItemCount)
+
+	return visibleItemCount
 end
 
 closeItemInfo = function()
@@ -700,6 +845,7 @@ local function showTab(tabName)
 
 		setSlotSelected(ui.ItemsTabButton, tabName == "Items")
 		setSlotSelected(ui.PassivesTabButton, tabName == "Passives")
+		updateEmptyStateLabels()
 	end
 
 	if tabName == "Passives" and ui.ItemInfoPanel and ui.ItemInfoPanel.Visible then
@@ -719,7 +865,7 @@ local function openInventory()
 	showTab(currentTab)
 
 	if ui.InventoryScale then
-		local targetScale = ResponsiveUI.IsMobileLike() and 0.74 or 1
+		local targetScale = getCurrentResponsiveScales().Inventory
 		ui.InventoryScale.Scale = targetScale * 0.92
 		TweenService:Create(ui.InventoryScale, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 			Scale = targetScale,
@@ -735,7 +881,7 @@ local function closeInventory()
 	closeItemInfo()
 
 	if ui.InventoryScale then
-		local targetScale = ResponsiveUI.IsMobileLike() and 0.74 or 1
+		local targetScale = getCurrentResponsiveScales().Inventory
 		TweenService:Create(ui.InventoryScale, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
 			Scale = targetScale * 0.92,
 		}):Play()
@@ -1029,26 +1175,8 @@ local function hookButtons()
 end
 
 local function setupPassivesPlaceholder()
-	if not ui.PassivesScroll then
-		return
-	end
-
-	local placeholder = ui.PassivesScroll:FindFirstChild("PassivesSoon")
-
-	if not placeholder then
-		placeholder = Instance.new("TextLabel")
-		placeholder.Name = "PassivesSoon"
-		placeholder.BackgroundTransparency = 1
-		placeholder.Font = Enum.Font.Arcade
-		placeholder.Position = UDim2.fromOffset(30, 30)
-		placeholder.Size = UDim2.fromOffset(360, 60)
-		placeholder.Text = "Пассивы скоро"
-		placeholder.TextColor3 = Color3.fromRGB(255, 255, 255)
-		placeholder.TextScaled = true
-		placeholder.TextStrokeTransparency = 0.25
-		placeholder.ZIndex = 8
-		placeholder.Parent = ui.PassivesScroll
-	end
+	setupEmptyStateLabels()
+	updateEmptyStateLabels()
 end
 
 cacheGui()
@@ -1057,7 +1185,8 @@ captureBaseLayout()
 applyInventoryTextStyles(gui)
 applyInventoryAssets()
 ensureCloseInfoButtonVisible()
-updateResponsiveScale()
+applyResponsiveScales()
+task.defer(applyResponsiveScales)
 hookButtons()
 hookItemSlots()
 setupPassivesPlaceholder()
@@ -1067,7 +1196,9 @@ updateActiveBuffs(latestInventoryData)
 
 local camera = Workspace.CurrentCamera
 if camera then
-	camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateResponsiveScale)
+	camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+		applyResponsiveScales()
+	end)
 end
 
 syncInventoryRemote.OnClientEvent:Connect(updateInventory)
