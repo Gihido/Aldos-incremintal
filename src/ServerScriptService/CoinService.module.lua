@@ -6,8 +6,8 @@ local ServerStorage = game:GetService("ServerStorage")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
-local DataService = require(script.Parent.DataService)
-local UpgradeService = require(script.Parent.UpgradeService)
+local DataService = require(script.Parent:WaitForChild("DataService"))
+local UpgradeService = require(script.Parent:WaitForChild("UpgradeService"))
 
 local RESPAWN_SECONDS = 1
 local FILL_CHECK_SECONDS = 1
@@ -23,6 +23,7 @@ local CHASE_TIMEOUT_SECONDS = 5
 local COIN_COLOR = Color3.fromRGB(210, 210, 210)
 local COIN_HIGHLIGHT_FILL = Color3.fromRGB(235, 235, 235)
 local COIN_HIGHLIGHT_OUTLINE = Color3.fromRGB(255, 255, 255)
+local RING_COLOR = Color3.fromRGB(235, 235, 235)
 
 local CoinService = {}
 
@@ -483,6 +484,7 @@ end
 
 local function getRandomCoinCFrame()
 	local halfSize = zonePart.Size * 0.5
+
 	local x = random:NextNumber(-halfSize.X, halfSize.X)
 	local z = random:NextNumber(-halfSize.Z, halfSize.Z)
 	local y = halfSize.Y + 1.5
@@ -580,6 +582,7 @@ local function startFillLoop()
 	end
 
 	fillLoopStarted = true
+
 	task.spawn(function()
 		while true do
 			CoinService.FillCoinsToLimit()
