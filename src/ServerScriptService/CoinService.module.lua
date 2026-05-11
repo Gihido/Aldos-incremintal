@@ -24,6 +24,7 @@ local CHASE_TIMEOUT_SECONDS = 5
 local COIN_COLOR = Color3.fromRGB(210, 210, 210)
 local COIN_HIGHLIGHT_FILL = Color3.fromRGB(235, 235, 235)
 local COIN_HIGHLIGHT_OUTLINE = Color3.fromRGB(255, 255, 255)
+local RING_COLOR = Color3.fromRGB(235, 235, 235)
 
 local CoinService = {}
 
@@ -540,6 +541,7 @@ end
 
 local function getRandomCoinCFrame()
 	local halfSize = zonePart.Size * 0.5
+
 	local x = random:NextNumber(-halfSize.X, halfSize.X)
 	local z = random:NextNumber(-halfSize.Z, halfSize.Z)
 	local y = halfSize.Y + 1.5
@@ -637,6 +639,7 @@ local function startFillLoop()
 	end
 
 	fillLoopStarted = true
+
 	task.spawn(function()
 		while true do
 			CoinService.FillCoinsToLimit()
