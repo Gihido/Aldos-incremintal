@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 local Workspace = game:GetService("Workspace")
 
 local shared = ReplicatedStorage:WaitForChild("Shared")
@@ -23,26 +24,27 @@ local PRESS_STROKE = Color3.fromRGB(255, 255, 180)
 local TWEEN_FAST = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local TWEEN_PANEL_OPEN = TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local TWEEN_PANEL_CLOSE = TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-local RESPONSIVE_SCALES = {
+local FORCE_MOBILE_IN_STUDIO = false
+local UI_PROFILES = {
 	Desktop = {
-		Inventory = 1,
-		ToggleButton = 1,
-		Tooltip = 1,
-		Buffs = 1,
+		InventoryScale = 1,
+		ToggleScale = 1,
+		TooltipScale = 1,
+		BuffsScale = 1,
 	},
 
 	Mobile = {
-		Inventory = 0.72,
-		ToggleButton = 0.82,
-		Tooltip = 0.82,
-		Buffs = 0.78,
+		InventoryScale = 0.56,
+		ToggleScale = 0.68,
+		TooltipScale = 0.68,
+		BuffsScale = 0.60,
 	},
 
 	SmallMobile = {
-		Inventory = 0.62,
-		ToggleButton = 0.75,
-		Tooltip = 0.75,
-		Buffs = 0.68,
+		InventoryScale = 0.48,
+		ToggleScale = 0.60,
+		TooltipScale = 0.60,
+		BuffsScale = 0.52,
 	},
 }
 
@@ -271,23 +273,61 @@ local function getOrCreateScale(parent, name)
 	return scale
 end
 
-local function getResponsiveProfile()
+local function getViewport()
 	local camera = Workspace.CurrentCamera
-	local viewport = camera and camera.ViewportSize or Vector2.new(1920, 1080)
+	return camera and camera.ViewportSize or Vector2.new(1920, 1080)
+end
+
+local function isMobileDevice()
+	if FORCE_MOBILE_IN_STUDIO then
+		return true
+	end
+
+	local viewport = getViewport()
+	local minSide = math.min(viewport.X, viewport.Y)
+	local maxSide = math.max(viewport.X, viewport.Y)
+	local aspect = maxSide / math.max(minSide, 1)
+	local touch = UserInputService.TouchEnabled
+	local keyboard = UserInputService.KeyboardEnabled
+	local tenFoot = GuiService:IsTenFootInterface()
+
+	if tenFoot then
+		return false
+	end
+
+	if minSide <= 800 then
+		return true
+	end
+
+	if touch and not keyboard then
+		return true
+	end
+
+	if touch and aspect >= 1.6 and minSide <= 900 then
+		return true
+	end
+
+	return false
+end
+
+local function getUIProfileName()
+	local viewport = getViewport()
 	local minSide = math.min(viewport.X, viewport.Y)
 
-	if minSide <= 500 then
-		return "SmallMobile", viewport
-	elseif minSide <= 700 then
-		return "Mobile", viewport
-	else
-		return "Desktop", viewport
+	if isMobileDevice() then
+		if minSide <= 500 then
+			return "SmallMobile"
+		end
+
+		return "Mobile"
 	end
+
+	return "Desktop"
 end
 
 local function getCurrentResponsiveScales()
-	local profile = getResponsiveProfile()
-	return RESPONSIVE_SCALES[profile] or RESPONSIVE_SCALES.Desktop
+	local profileName = getUIProfileName()
+	return UI_PROFILES[profileName] or UI_PROFILES.Desktop
 end
 
 local function getItemCount(itemId)
@@ -406,31 +446,31 @@ local function applyInventoryAssets()
 	setImageOrFallback(ui.DeleteButton, mainAssets.DeleteButtonBackground, Color3.fromRGB(120, 50, 45))
 end
 
-local function applyResponsiveScales()
-	local profile, viewport = getResponsiveProfile()
-	local scales = RESPONSIVE_SCALES[profile] or RESPONSIVE_SCALES.Desktop
+local function applyResponsiveMode()
+	local profileName = getUIProfileName()
+	local profile = UI_PROFILES[profileName] or UI_PROFILES.Desktop
+	local viewport = getViewport()
 
 	if ui.InventoryScale then
-		ui.InventoryScale.Scale = scales.Inventory
+		ui.InventoryScale.Scale = profile.InventoryScale
 	end
 
 	if ui.ButtonScale then
-		ui.ButtonScale.Scale = scales.ToggleButton
+		ui.ButtonScale.Scale = profile.ToggleScale
 	end
 
 	if ui.TooltipScale then
-		ui.TooltipScale.Scale = scales.Tooltip
+		ui.TooltipScale.Scale = profile.TooltipScale
 	end
 
 	if ui.BuffsScale then
-		ui.BuffsScale.Scale = scales.Buffs
+		ui.BuffsScale.Scale = profile.BuffsScale
 	end
 
-	print("[InventoryClient] Responsive profile:", profile, "Viewport:", viewport)
-	print("[InventoryClient] InventoryScale:", ui.InventoryScale and ui.InventoryScale.Scale or "missing")
-	print("[InventoryClient] ButtonScale:", ui.ButtonScale and ui.ButtonScale.Scale or "missing")
-	print("[InventoryClient] TooltipScale:", ui.TooltipScale and ui.TooltipScale.Scale or "missing")
-	print("[InventoryClient] BuffsScale:", ui.BuffsScale and ui.BuffsScale.Scale or "missing")
+	print("[InventoryClient] Responsive applied:", profileName, viewport)
+	print("[InventoryClient] Viewport:", viewport.X, viewport.Y)
+	print("[InventoryClient] Touch:", UserInputService.TouchEnabled, "Keyboard:", UserInputService.KeyboardEnabled, "TenFoot:", GuiService:IsTenFootInterface())
+	print("[InventoryClient] Scales:", ui.InventoryScale and ui.InventoryScale.Scale or "missing", ui.ButtonScale and ui.ButtonScale.Scale or "missing", ui.TooltipScale and ui.TooltipScale.Scale or "missing", ui.BuffsScale and ui.BuffsScale.Scale or "missing")
 end
 
 local function ensureCloseInfoButtonVisible()
@@ -865,7 +905,7 @@ local function openInventory()
 	showTab(currentTab)
 
 	if ui.InventoryScale then
-		local targetScale = getCurrentResponsiveScales().Inventory
+		local targetScale = getCurrentResponsiveScales().InventoryScale
 		ui.InventoryScale.Scale = targetScale * 0.92
 		TweenService:Create(ui.InventoryScale, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 			Scale = targetScale,
@@ -881,7 +921,7 @@ local function closeInventory()
 	closeItemInfo()
 
 	if ui.InventoryScale then
-		local targetScale = getCurrentResponsiveScales().Inventory
+		local targetScale = getCurrentResponsiveScales().InventoryScale
 		TweenService:Create(ui.InventoryScale, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
 			Scale = targetScale * 0.92,
 		}):Play()
@@ -1185,8 +1225,10 @@ captureBaseLayout()
 applyInventoryTextStyles(gui)
 applyInventoryAssets()
 ensureCloseInfoButtonVisible()
-applyResponsiveScales()
-task.defer(applyResponsiveScales)
+applyResponsiveMode()
+task.defer(applyResponsiveMode)
+task.delay(0.25, applyResponsiveMode)
+task.delay(1, applyResponsiveMode)
 hookButtons()
 hookItemSlots()
 setupPassivesPlaceholder()
@@ -1197,7 +1239,7 @@ updateActiveBuffs(latestInventoryData)
 local camera = Workspace.CurrentCamera
 if camera then
 	camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-		applyResponsiveScales()
+		task.defer(applyResponsiveMode)
 	end)
 end
 

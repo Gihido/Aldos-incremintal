@@ -136,6 +136,26 @@ local function getUIProfile()
 	return ResponsiveUI.IsMobileLike() and UI_PROFILES.Mobile or UI_PROFILES.Desktop
 end
 
+local function getAdminScale()
+	local profileName = ResponsiveUI.GetProfileName()
+
+	if profileName == "SmallMobile" then
+		return 0.50
+	elseif profileName == "Mobile" then
+		return 0.58
+	else
+		return 1
+	end
+end
+
+local function printResponsiveDebug()
+	local info = ResponsiveUI.GetDeviceInfo()
+	print("[AdminPanelClient] Responsive applied:", ResponsiveUI.GetProfileName(), info.Viewport)
+	print("[AdminPanelClient] Viewport:", info.Viewport.X, info.Viewport.Y)
+	print("[AdminPanelClient] Touch:", info.TouchEnabled, "Keyboard:", info.KeyboardEnabled, "TenFoot:", info.TenFoot)
+	print("[AdminPanelClient] AdminScale:", scaleObject and scaleObject.Scale or "missing")
+end
+
 local function getPanelSize()
 	local size = getUIProfile().PanelSize
 
@@ -148,8 +168,10 @@ local function updateScale()
 	end
 
 	if scaleObject then
-		scaleObject.Scale = ResponsiveUI.IsMobileViewport() and ResponsiveUI.GetMobileScale("AdminPanel") or getUIProfile().PanelScale
+		scaleObject.Scale = getAdminScale()
 	end
+
+	printResponsiveDebug()
 
 	if openButton then
 		openButton.Size = getUIProfile().OpenButtonSize
@@ -231,10 +253,13 @@ local function createAdminPanel()
 	addStroke(panel, Color3.fromRGB(185, 235, 255), 3, 0.05)
 	addGradient(panel, PANEL_COLOR_TOP, PANEL_COLOR_BOTTOM)
 
-	scaleObject = Instance.new("UIScale")
-	scaleObject.Name = "AdminScale"
-	scaleObject.Scale = ResponsiveUI.IsMobileViewport() and ResponsiveUI.GetMobileScale("AdminPanel") or getUIProfile().PanelScale
-	scaleObject.Parent = panel
+	scaleObject = panel:FindFirstChild("AdminScale")
+	if not scaleObject then
+		scaleObject = Instance.new("UIScale")
+		scaleObject.Name = "AdminScale"
+		scaleObject.Parent = panel
+	end
+	scaleObject.Scale = getAdminScale()
 
 	createTextLabel(panel, "Title", "Admin Panel", UDim2.fromOffset(14, 10), UDim2.new(1, -56, 0, 36), 24)
 
@@ -398,9 +423,16 @@ local function createAdminPanel()
 		end)
 	end)
 
+	updateScale()
+	task.defer(updateScale)
+	task.delay(0.25, updateScale)
+	task.delay(1, updateScale)
+
 	local camera = Workspace.CurrentCamera
 	if camera then
-		camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
+		camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+			task.defer(updateScale)
+		end)
 	end
 end
 

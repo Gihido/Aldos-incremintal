@@ -33,6 +33,7 @@ local CARD_EXTRA_SCROLL_SPACE = 180
 local UI_PROFILES = {
 	Desktop = {
 		Notification = {
+			Scale = 1,
 			Width = 352,
 			Height = 92,
 			Padding = 14,
@@ -46,6 +47,7 @@ local UI_PROFILES = {
 			HiddenPosition = UDim2.fromScale(1.22, 0.08),
 		},
 		CoinPopup = {
+			Scale = 1,
 			Size = 74,
 			MinX = 0.12,
 			MaxX = 0.88,
@@ -58,27 +60,57 @@ local UI_PROFILES = {
 	},
 	Mobile = {
 		Notification = {
-			Width = 250,
-			Height = 64,
-			Padding = 10,
-			IconBoxSize = 42,
+			Scale = 0.65,
+			Width = 229,
+			Height = 60,
+			Padding = 9,
+			IconBoxSize = 40,
 			IconPadding = 5,
-			TextGap = 10,
-			TextSize = 18,
-			MinTextSize = 12,
-			MaxTextSize = 19,
+			TextGap = 9,
+			TextSize = 17,
+			MinTextSize = 11,
+			MaxTextSize = 18,
 			TargetPosition = UDim2.fromScale(0.98, 0.08),
 			HiddenPosition = UDim2.fromScale(1.22, 0.08),
 		},
 		CoinPopup = {
-			Size = 53,
+			Scale = 0.62,
+			Size = 46,
 			MinX = 0.18,
 			MaxX = 0.82,
 			StartY = 0.94,
 			StartJitter = 0.01,
 			PeakY = 0.80,
 			PeakJitter = 0.015,
-			MaxTextSize = 21,
+			MaxTextSize = 18,
+		},
+	},
+
+	SmallMobile = {
+		Notification = {
+			Scale = 0.58,
+			Width = 204,
+			Height = 53,
+			Padding = 8,
+			IconBoxSize = 35,
+			IconPadding = 4,
+			TextGap = 8,
+			TextSize = 15,
+			MinTextSize = 10,
+			MaxTextSize = 16,
+			TargetPosition = UDim2.fromScale(0.98, 0.08),
+			HiddenPosition = UDim2.fromScale(1.22, 0.08),
+		},
+		CoinPopup = {
+			Scale = 0.55,
+			Size = 41,
+			MinX = 0.20,
+			MaxX = 0.80,
+			StartY = 0.93,
+			StartJitter = 0.01,
+			PeakY = 0.78,
+			PeakJitter = 0.015,
+			MaxTextSize = 16,
 		},
 	},
 }
@@ -101,7 +133,14 @@ local updateUpgradeBoard
 
 
 local function getUIProfile()
-	return ResponsiveUI.IsMobileLike() and UI_PROFILES.Mobile or UI_PROFILES.Desktop
+	local profileName = ResponsiveUI.GetProfileName()
+	return UI_PROFILES[profileName] or UI_PROFILES.Desktop
+end
+
+local function printResponsiveDebug(source)
+	local info = ResponsiveUI.GetDeviceInfo()
+	print("[ClientEffects] Responsive profile:", ResponsiveUI.GetProfileName(), "Source:", source, "Viewport:", info.Viewport)
+	print("[ClientEffects] Touch:", info.TouchEnabled, "Keyboard:", info.KeyboardEnabled, "TenFoot:", info.TenFoot)
 end
 
 local function getGameFont()
@@ -356,6 +395,8 @@ local function showCoinPickupPopup(amount)
 
 	local popupLayer = getOrCreateGuiLayer("CoinPickupGui", 20)
 	local profile = getUIProfile().CoinPopup
+	printResponsiveDebug("CoinPopup")
+	print("[ClientEffects] CoinPopupScale:", profile.Scale or 1, "Size:", profile.Size)
 	local popupSize = profile.Size
 	local randomX = profile.MinX + (math.random() * (profile.MaxX - profile.MinX))
 	local startY = profile.StartY + (math.random() * profile.StartJitter)
@@ -464,6 +505,8 @@ local function showNotification(notificationType, message)
 	local assetConfig = getNotificationAssetConfig(notificationType)
 	local notificationLayer = getOrCreateGuiLayer("NotificationsGui", 100)
 	local profile = getUIProfile().Notification
+	printResponsiveDebug("Notification")
+	print("[ClientEffects] NotificationScale:", profile.Scale or 1, "Size:", profile.Width, profile.Height)
 	notificationCount += 1
 
 	local targetPosition = profile.TargetPosition
