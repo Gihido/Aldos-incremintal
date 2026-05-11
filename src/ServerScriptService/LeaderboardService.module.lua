@@ -126,7 +126,7 @@ local function createRow(parent, index)
 	row.BackgroundTransparency = index % 2 == 0 and 0.18 or 0.3
 	row.BorderSizePixel = 0
 	row.LayoutOrder = index
-	row.Size = UDim2.new(1, -12, 0, 32)
+	row.Size = UDim2.new(1, -12, 0, 36)
 	row.ZIndex = 4
 	row.Parent = parent
 
@@ -191,12 +191,17 @@ local function setupBoard()
 		surfaceGui = Instance.new("SurfaceGui")
 		surfaceGui.Name = "LeaderboardSurfaceGui"
 		surfaceGui.Face = Enum.NormalId.Front
-		surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-		surfaceGui.PixelsPerStud = 70
+		surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+		surfaceGui.CanvasSize = Vector2.new(1200, 700)
+		surfaceGui.PixelsPerStud = 75
 		surfaceGui.LightInfluence = 0
 		surfaceGui.Parent = boardPart
 	else
 		surfaceGui:ClearAllChildren()
+		surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+		surfaceGui.CanvasSize = Vector2.new(1200, 700)
+		surfaceGui.PixelsPerStud = 75
+		surfaceGui.LightInfluence = 0
 	end
 
 	rowLabels = {}
@@ -271,7 +276,7 @@ local function setupBoard()
 	list.Name = "Rows"
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0
-	list.CanvasSize = UDim2.fromOffset(0, MAX_LEADERBOARD_ROWS * 37)
+	list.CanvasSize = UDim2.fromOffset(0, MAX_LEADERBOARD_ROWS * 42)
 	list.Position = UDim2.fromScale(0.03, 0.20)
 	list.ScrollBarImageColor3 = Color3.fromRGB(225, 230, 180)
 	list.ScrollBarThickness = 8
@@ -280,7 +285,7 @@ local function setupBoard()
 	list.Parent = panel
 
 	local layout = Instance.new("UIListLayout")
-	layout.Padding = UDim.new(0, 5)
+	layout.Padding = UDim.new(0, 6)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = list
 
