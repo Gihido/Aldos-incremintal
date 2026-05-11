@@ -6,20 +6,23 @@ local ServerStorage = game:GetService("ServerStorage")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
-local DataService = require(script.Parent.DataService)
-local UpgradeService = require(script.Parent.UpgradeService)
+local DataService = require(script.Parent:WaitForChild("DataService"))
+local UpgradeService = require(script.Parent:WaitForChild("UpgradeService"))
 
 local RESPAWN_SECONDS = 1
 local FILL_CHECK_SECONDS = 1
 local COLLECT_CHECK_SECONDS = 0.12
+
 local COLLECT_SQUARE_SIZE = 3
 local ZONE_EXIT_HYSTERESIS = 1
+
 local COIN_LAUNCH_SECONDS = 0.3
 local START_CHASE_SPEED = 12
 local CHASE_ACCELERATION = 55
 local MAX_CHASE_SPEED = 90
 local HIT_DISTANCE = 1.8
 local CHASE_TIMEOUT_SECONDS = 5
+
 local COIN_COLOR = Color3.fromRGB(135, 135, 135)
 local COIN_HIGHLIGHT_FILL = Color3.fromRGB(170, 170, 170)
 local COIN_HIGHLIGHT_OUTLINE = Color3.fromRGB(255, 255, 255)
@@ -31,16 +34,17 @@ local coinTemplate
 local zonePart
 local coinCollectedEffect
 local collectZoneStateRemote
+
 local activeCoins = {}
 local fillLoopStarted = false
 local collectLoopStarted = false
 local playersInsideZone = {}
+
 local random = Random.new()
 local spawnCoin
 
 local function getPlayerRoot(player)
 	local character = player and player.Character
-
 	return character and character:FindFirstChild("HumanoidRootPart") or nil
 end
 
@@ -104,7 +108,6 @@ local function getCoinCFrame(coin)
 	end
 
 	local rootPart = getCoinRootPart(coin)
-
 	return rootPart and rootPart.CFrame or CFrame.new()
 end
 
@@ -113,25 +116,23 @@ local function getCoinPosition(coin)
 end
 
 local function setCoinCFrame(coin, cframe)
-	if not coin then
+	if not coin or not coin.Parent then
 		return
 	end
 
 	if coin:IsA("Model") then
-		local ok = pcall(function()
+		pcall(function()
 			coin:PivotTo(cframe)
 		end)
+		return
+	end
 
-		if ok then
-			return
-		end
-	elseif coin:IsA("BasePart") then
+	if coin:IsA("BasePart") then
 		coin.CFrame = cframe
 		return
 	end
 
 	local rootPart = getCoinRootPart(coin)
-
 	if not rootPart then
 		return
 	end
@@ -152,8 +153,8 @@ local function getActiveCoinCount()
 	local activeCount = 0
 
 	for coin in pairs(activeCoins) do
-		if coin.Parent then
-			activeCount = activeCount + 1
+		if coin and coin.Parent then
+			activeCount += 1
 		else
 			removeActiveCoin(coin)
 		end
@@ -180,13 +181,13 @@ local function isPlayerInsideZone(player)
 	end
 
 	local root = getPlayerRoot(player)
-
 	if not root then
 		return false
 	end
 
 	local previousState = playersInsideZone[player] == true
 	local margin = previousState and ZONE_EXIT_HYSTERESIS or 0
+
 	local localPosition = zonePart.CFrame:PointToObjectSpace(root.Position)
 	local halfSize = zonePart.Size * 0.5
 
@@ -209,7 +210,6 @@ end
 
 local function isCoinInsideCollectSquare(player, coin)
 	local root = getPlayerRoot(player)
-
 	if not root then
 		return false
 	end
@@ -223,7 +223,12 @@ local function isCoinInsideCollectSquare(player, coin)
 end
 
 local function createCoinLaunchRingEffect(coin)
+	if not coin or not coin.Parent then
+		return
+	end
+
 	local coinPosition = getCoinPosition(coin)
+
 	local ring = Instance.new("Part")
 	ring.Name = "CoinLaunchRing"
 	ring.Anchored = true
@@ -239,17 +244,21 @@ local function createCoinLaunchRingEffect(coin)
 	ring.CFrame = CFrame.new(coinPosition - Vector3.new(0, 0.25, 0)) * CFrame.Angles(0, 0, math.rad(90))
 	ring.Parent = Workspace
 
-	local tween = TweenService:Create(ring, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Size = Vector3.new(0.08, 4.5, 4.5),
-		Transparency = 1,
-	})
+	local tween = TweenService:Create(
+		ring,
+		TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{
+			Size = Vector3.new(0.08, 4.5, 4.5),
+			Transparency = 1,
+		}
+	)
+
 	tween:Play()
 	Debris:AddItem(ring, 0.6)
 end
 
 local function createWhiteCoinImpact(player)
 	local root = getPlayerRoot(player)
-
 	if not root then
 		return
 	end
@@ -272,8 +281,8 @@ local function createWhiteCoinImpact(player)
 		NumberSequenceKeypoint.new(1, 1),
 	})
 	emitter.Parent = attachment
-	emitter:Emit(22)
 
+	emitter:Emit(22)
 	Debris:AddItem(attachment, 0.9)
 end
 
@@ -331,15 +340,16 @@ local function cancelCollectedCoin(coin)
 end
 
 local function finishCoinCollection(player, coin, amount)
-	if not coin or not coin.Parent then
+	if not player or not coin or not coin.Parent then
 		return
 	end
 
 	local newCoinBalance = awardCoinsToPlayer(player, amount)
+
 	local leaderstats = player:FindFirstChild("leaderstats")
 	local coins = leaderstats and leaderstats:FindFirstChild("Coins")
 
-	if coins and newCoinBalance then
+	if coins and typeof(newCoinBalance) == "number" then
 		coins.Value = newCoinBalance
 	end
 
@@ -350,8 +360,10 @@ local function finishCoinCollection(player, coin, amount)
 	end
 
 	syncPlayer(player)
+
 	removeActiveCoin(coin)
 	coin:Destroy()
+
 	scheduleCoinRespawn()
 end
 
@@ -364,7 +376,9 @@ local function animateCoinToPosition(coin, targetPosition, duration)
 		local alpha = math.clamp((os.clock() - startedAt) / duration, 0, 1)
 		local eased = 1 - ((1 - alpha) * (1 - alpha))
 		local position = startPosition:Lerp(targetPosition, eased)
+
 		setCoinCFrame(coin, CFrame.new(position))
+
 		RunService.Heartbeat:Wait()
 	end
 
@@ -384,6 +398,7 @@ local function runCoinChase(player, coin, amount)
 	local startedAt = os.clock()
 	local speed = START_CHASE_SPEED
 	local rotation = 0
+
 	local startPosition = getCoinPosition(coin)
 	local awayDirection = startPosition - root.Position
 
@@ -398,6 +413,7 @@ local function runCoinChase(player, coin, amount)
 	end
 
 	createCoinLaunchRingEffect(coin)
+
 	local liftPosition = startPosition + Vector3.new(0, 3, 0) + (awayDirection.Unit * 2)
 	animateCoinToPosition(coin, liftPosition, COIN_LAUNCH_SECONDS)
 
@@ -411,6 +427,7 @@ local function runCoinChase(player, coin, amount)
 
 		local currentPosition = getCoinPosition(coin)
 		local targetPosition = root.Position + Vector3.new(0, 1.2, 0)
+
 		local direction = targetPosition - currentPosition
 		local distance = direction.Magnitude
 
@@ -420,6 +437,7 @@ local function runCoinChase(player, coin, amount)
 		end
 
 		local deltaTime = RunService.Heartbeat:Wait()
+
 		speed = math.min(MAX_CHASE_SPEED, speed + (CHASE_ACCELERATION * deltaTime))
 
 		if os.clock() - startedAt > CHASE_TIMEOUT_SECONDS then
@@ -429,8 +447,13 @@ local function runCoinChase(player, coin, amount)
 		if direction.Magnitude > 0.001 then
 			local step = math.min(distance, speed * deltaTime)
 			local newPosition = currentPosition + (direction.Unit * step)
-			rotation = rotation + (deltaTime * 12)
-			local newCFrame = CFrame.new(newPosition) * CFrame.Angles(rotation, rotation * 0.7, rotation * 0.35)
+
+			rotation += deltaTime * 12
+
+			local newCFrame =
+				CFrame.new(newPosition)
+				* CFrame.Angles(rotation, rotation * 0.7, rotation * 0.35)
+
 			setCoinCFrame(coin, newCFrame)
 		end
 	end
@@ -474,6 +497,7 @@ end
 
 local function getRandomCoinCFrame()
 	local halfSize = zonePart.Size * 0.5
+
 	local x = random:NextNumber(-halfSize.X, halfSize.X)
 	local z = random:NextNumber(-halfSize.Z, halfSize.Z)
 	local y = halfSize.Y + 1.5
@@ -526,10 +550,7 @@ spawnCoin = function()
 	styleCoin(coin)
 	setCoinCFrame(coin, getRandomCoinCFrame())
 
-	return math.abs(localPosition.X) <= halfSize.X + margin
-		and math.abs(localPosition.Y) <= halfSize.Y + 5
-		and math.abs(localPosition.Z) <= halfSize.Z + margin
-end
+	local coinParts = getCoinParts(coin)
 
 	if #coinParts == 0 or not getCoinRootPart(coin) then
 		warn("Spawned coin has no BasePart to collect or animate")
@@ -559,6 +580,7 @@ local function startFillLoop()
 	end
 
 	fillLoopStarted = true
+
 	task.spawn(function()
 		while true do
 			CoinService.FillCoinsToLimit()
@@ -573,6 +595,7 @@ local function startCollectLoop()
 	end
 
 	collectLoopStarted = true
+
 	task.spawn(function()
 		while true do
 			for _, player in ipairs(Players:GetPlayers()) do
@@ -581,7 +604,11 @@ local function startCollectLoop()
 
 				if isInside then
 					for coin in pairs(activeCoins) do
-						if coin.Parent and not coin:GetAttribute("Collected") and isCoinInsideCollectSquare(player, coin) then
+						if coin
+							and coin.Parent
+							and not coin:GetAttribute("Collected")
+							and isCoinInsideCollectSquare(player, coin)
+						then
 							tryCollectCoinForPlayer(player, coin)
 						end
 					end
@@ -596,14 +623,40 @@ end
 function CoinService.Init(remotes)
 	coinTemplate = ServerStorage:WaitForChild("CoinPart")
 	zonePart = Workspace:WaitForChild("ZonePart")
-	coinCollectedEffect = remotes.CoinCollectedEffect or ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CoinCollectedEffect")
-	collectZoneStateRemote = remotes.CollectZoneState or ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CollectZoneState")
 
-	UpgradeService.OnMaxCoinsChanged(function()
-		CoinService.FillCoinsToLimit()
-	end)
+	local remotesFolder = ReplicatedStorage:WaitForChild("Remotes")
+
+	if typeof(remotes) == "Instance" then
+		coinCollectedEffect =
+			remotes:FindFirstChild("CoinCollectedEffect")
+			or remotesFolder:WaitForChild("CoinCollectedEffect")
+
+		collectZoneStateRemote =
+			remotes:FindFirstChild("CollectZoneState")
+			or remotesFolder:WaitForChild("CollectZoneState")
+	elseif type(remotes) == "table" then
+		coinCollectedEffect =
+			remotes.CoinCollectedEffect
+			or remotesFolder:WaitForChild("CoinCollectedEffect")
+
+		collectZoneStateRemote =
+			remotes.CollectZoneState
+			or remotesFolder:WaitForChild("CollectZoneState")
+	else
+		coinCollectedEffect = remotesFolder:WaitForChild("CoinCollectedEffect")
+		collectZoneStateRemote = remotesFolder:WaitForChild("CollectZoneState")
+	end
+
+	if type(UpgradeService.OnMaxCoinsChanged) == "function" then
+		UpgradeService.OnMaxCoinsChanged(function()
+			CoinService.FillCoinsToLimit()
+		end)
+	else
+		warn("UpgradeService.OnMaxCoinsChanged is not available")
+	end
 
 	CoinService.FillCoinsToLimit()
+
 	Players.PlayerRemoving:Connect(function(player)
 		playersInsideZone[player] = nil
 	end)
