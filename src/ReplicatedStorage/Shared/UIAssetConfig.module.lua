@@ -1,4 +1,8 @@
 local UIAssetConfig = {
+	Fonts = {
+		Main = Enum.Font.Arcade,
+	},
+
 	UpgradeCards = {
 		CoinGain = {
 			CardBackground = "rbxassetid://0",
@@ -13,6 +17,7 @@ local UIAssetConfig = {
 			BuyButtonBackground = "rbxassetid://0",
 			BuyMaxButtonBackground = "rbxassetid://0",
 
+			TooltipBackground = "rbxassetid://0",
 			PurchaseEffectImage = "rbxassetid://0",
 		},
 		MultiCoins = {
@@ -28,6 +33,7 @@ local UIAssetConfig = {
 			BuyButtonBackground = "rbxassetid://0",
 			BuyMaxButtonBackground = "rbxassetid://0",
 
+			TooltipBackground = "rbxassetid://0",
 			PurchaseEffectImage = "rbxassetid://0",
 		},
 		MaxSpawnCoins = {
@@ -43,6 +49,7 @@ local UIAssetConfig = {
 			BuyButtonBackground = "rbxassetid://0",
 			BuyMaxButtonBackground = "rbxassetid://0",
 
+			TooltipBackground = "rbxassetid://0",
 			PurchaseEffectImage = "rbxassetid://0",
 		},
 	},
@@ -80,6 +87,10 @@ local UIAssetConfig = {
 	},
 
 	Leaderboard = {
+		BackgroundImage = "rbxassetid://0",
+	},
+
+	CollectZone = {
 		BackgroundImage = "rbxassetid://0",
 	},
 }

@@ -46,6 +46,51 @@ local pendingPurchaseEffectButton
 local upgradeGuiReady = false
 local updateUpgradeBoard
 
+
+local function getGameFont()
+	return (UIAssetConfig.Fonts and UIAssetConfig.Fonts.Main) or Enum.Font.Arcade
+end
+
+local function applyGameFont(textObject)
+	if textObject and (textObject:IsA("TextLabel") or textObject:IsA("TextButton") or textObject:IsA("TextBox")) then
+		textObject.Font = getGameFont()
+	end
+end
+
+local function applyAnimatedTextGradient(textObject)
+	if not textObject or not (textObject:IsA("TextLabel") or textObject:IsA("TextButton") or textObject:IsA("TextBox")) then
+		return nil
+	end
+
+	local gradient = textObject:FindFirstChild("AnimatedTextGradient")
+
+	if not gradient then
+		gradient = Instance.new("UIGradient")
+		gradient.Name = "AnimatedTextGradient"
+		gradient.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+			ColorSequenceKeypoint.new(0.48, Color3.fromRGB(95, 95, 95)),
+			ColorSequenceKeypoint.new(0.72, Color3.fromRGB(18, 18, 18)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+		})
+		gradient.Offset = Vector2.new(-1, 0)
+		gradient.Parent = textObject
+	end
+
+	task.spawn(function()
+		while gradient.Parent == textObject do
+			gradient.Offset = Vector2.new(-1, 0)
+			local tween = TweenService:Create(gradient, TweenInfo.new(2.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+				Offset = Vector2.new(1, 0),
+			})
+			tween:Play()
+			tween.Completed:Wait()
+		end
+	end)
+
+	return gradient
+end
+
 local function getPlayerGui()
 	return player:WaitForChild("PlayerGui")
 end
@@ -259,8 +304,8 @@ local function showCoinPickupPopup(amount)
 	local minX = isMobileLike and 0.16 or 0.1
 	local maxX = isMobileLike and 0.84 or 0.9
 	local randomX = minX + (math.random() * (maxX - minX))
-	local startY = isMobileLike and (0.91 + (math.random() * 0.03)) or (0.92 + (math.random() * 0.04))
-	local peakY = isMobileLike and (0.75 + (math.random() * 0.05)) or (0.78 + (math.random() * 0.03))
+	local startY = isMobileLike and (0.96 + (math.random() * 0.015)) or (0.98 + (math.random() * 0.01))
+	local peakY = isMobileLike and (0.80 + (math.random() * 0.025)) or (0.83 + (math.random() * 0.02))
 	local startRotation = math.random(-8, 8)
 	local fallRotation = startRotation + math.random(360, 540)
 
@@ -310,7 +355,7 @@ local function showCoinPickupPopup(amount)
 	local text = Instance.new("TextLabel")
 	text.Name = "Amount"
 	text.BackgroundTransparency = 1
-	text.Font = Enum.Font.GothamBlack
+	text.Font = getGameFont()
 	text.Position = UDim2.fromScale(0.05, 0.05)
 	text.Size = UDim2.fromScale(0.9, 0.9)
 	text.Text = `+{FormatNumber(amount)}`
@@ -322,6 +367,7 @@ local function showCoinPickupPopup(amount)
 	text.TextYAlignment = Enum.TextYAlignment.Center
 	text.ZIndex = popup.ZIndex + 2
 	text.Parent = popup
+	applyAnimatedTextGradient(text)
 
 	local textSizeConstraint = Instance.new("UITextSizeConstraint")
 	textSizeConstraint.MaxTextSize = isMobileLike and 22 or 28
@@ -410,7 +456,7 @@ local function showNotification(notificationType, message)
 	label.Name = "Message"
 	label.BackgroundTransparency = 1
 	label.BorderSizePixel = 0
-	label.Font = Enum.Font.GothamBold
+	label.Font = getGameFont()
 	label.Position = UDim2.fromOffset(60, 7)
 	label.Size = UDim2.new(1, -70, 1, -14)
 	label.Text = message
@@ -421,7 +467,7 @@ local function showNotification(notificationType, message)
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.ZIndex = frame.ZIndex + 5
 	label.Parent = frame
-	addCorner(label, UDim.new(0, 6))
+	applyAnimatedTextGradient(label)
 
 	TweenService:Create(frame, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 		Position = targetPosition,
@@ -457,7 +503,7 @@ local function createText(parent, name, textValue, position, size, font, color)
 	local text = Instance.new("TextLabel")
 	text.Name = name
 	text.BackgroundTransparency = 1
-	text.Font = font or Enum.Font.GothamBold
+	text.Font = font or getGameFont()
 	text.Position = position
 	text.Size = size
 	text.Text = textValue
@@ -468,6 +514,8 @@ local function createText(parent, name, textValue, position, size, font, color)
 	text.TextXAlignment = Enum.TextXAlignment.Left
 	text.ZIndex = 8
 	text.Parent = parent
+	applyGameFont(text)
+	applyAnimatedTextGradient(text)
 
 	return text
 end
@@ -562,20 +610,21 @@ local function styleButton(button, colorA, colorB, strokeColor, textColor, butto
 	end
 
 	local label = Instance.new("TextLabel")
-	label.Name = "FallbackText"
+	label.Name = "ButtonText"
 	label.BackgroundTransparency = 1
 	label.BorderSizePixel = 0
-	label.Font = Enum.Font.GothamBold
+	label.Font = getGameFont()
 	label.Position = UDim2.fromScale(0, 0)
 	label.Size = UDim2.fromScale(1, 1)
 	label.Text = fallbackText
-	label.TextColor3 = textColor
+	label.TextColor3 = Color3.fromRGB(255, 255, 255)
 	label.TextScaled = false
-	label.TextSize = fallbackText == "Buy Max" and 28 or 32
+	label.TextSize = fallbackText == "Buy Max" and 25 or 28
 	label.TextStrokeTransparency = 0.72
-	label.Visible = not hasButtonImage
+	label.Visible = true
 	label.ZIndex = button.ZIndex + 5
 	label.Parent = button
+	applyAnimatedTextGradient(label)
 
 	local scale = Instance.new("UIScale")
 	scale.Scale = 1
@@ -673,7 +722,7 @@ local function playPurchaseEffect(button, upgradeId)
 		Vector2.new(-82, 0),
 	}
 
-	for index, offset in directions do
+	for index, offset in ipairs(directions) do
 		local particle = Instance.new("ImageLabel")
 		particle.Name = `PurchaseBurst{index}`
 		particle.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -726,7 +775,7 @@ local function createBoxLabel(parent, name, textValue, font, color, options)
 	label.Name = name
 	label.BackgroundTransparency = 1
 	label.BorderSizePixel = 0
-	label.Font = font or Enum.Font.GothamBold
+	label.Font = font or getGameFont()
 	label.Position = options.Position or UDim2.fromOffset(8, 6)
 	label.Size = options.Size or UDim2.new(1, -16, 1, -12)
 	label.Text = textValue
@@ -739,6 +788,8 @@ local function createBoxLabel(parent, name, textValue, font, color, options)
 	label.TextYAlignment = Enum.TextYAlignment.Center
 	label.ZIndex = parent.ZIndex + 5
 	label.Parent = parent
+	applyGameFont(label)
+	applyAnimatedTextGradient(label)
 
 	if options.MinTextSize or options.MaxTextSize then
 		local sizeConstraint = Instance.new("UITextSizeConstraint")
@@ -750,79 +801,23 @@ local function createBoxLabel(parent, name, textValue, font, color, options)
 	return label
 end
 
-local function createTooltip(parent)
+local function createTooltip(parent, assetConfig)
 	local tooltip = createTextBox(
 		parent,
 		"Tooltip",
 		UDim2.fromOffset(220, 445),
 		UDim2.fromOffset(130, 38),
 		Color3.fromRGB(48, 54, 48),
-		(UIAssetConfig.Tooltip or {}).BackgroundImage,
+		(assetConfig and assetConfig.TooltipBackground) or (UIAssetConfig.Tooltip or {}).BackgroundImage,
 		80
 	)
 	tooltip.Visible = false
 
-	local label = createBoxLabel(tooltip, "TooltipText", "+1", Enum.Font.GothamBlack, Color3.fromRGB(255, 252, 220), {
+	local label = createBoxLabel(tooltip, "TooltipText", "+1", getGameFont(), Color3.fromRGB(255, 252, 220), {
 		TextScaled = false,
 		TextSize = 26,
 		TextStrokeTransparency = 0.62,
 	})
-
-	return tooltip
-end
-
-local function createTextBox(parent, name, position, size, color, backgroundImage, zIndex)
-	local box = Instance.new("Frame")
-	box.Name = name
-	box.BackgroundColor3 = color
-	box.BackgroundTransparency = hasCustomAssetId(backgroundImage) and 1 or 0.06
-	box.BorderSizePixel = 0
-	box.ClipsDescendants = true
-	box.Position = position
-	box.Size = size
-	box.ZIndex = zIndex
-	box.Parent = parent
-	addStroke(box, Color3.fromRGB(235, 235, 220), 2, 0.18)
-	addImageBackground(box, backgroundImage, 0.03, 0.95)
-
-	return box
-end
-
-local function createBoxLabel(parent, name, textValue, font, color)
-	local label = Instance.new("TextLabel")
-	label.Name = name
-	label.BackgroundTransparency = 1
-	label.BorderSizePixel = 0
-	label.Font = font or Enum.Font.GothamBold
-	label.Position = UDim2.fromOffset(8, 6)
-	label.Size = UDim2.new(1, -16, 1, -12)
-	label.Text = textValue
-	label.TextColor3 = color or Color3.fromRGB(248, 248, 236)
-	label.TextScaled = true
-	label.TextStrokeTransparency = 0.58
-	label.TextWrapped = true
-	label.TextXAlignment = Enum.TextXAlignment.Center
-	label.TextYAlignment = Enum.TextYAlignment.Center
-	label.ZIndex = parent.ZIndex + 5
-	label.Parent = parent
-
-	return label
-end
-
-local function createTooltip(parent)
-	local tooltip = createTextBox(
-		parent,
-		"Tooltip",
-		UDim2.fromOffset(220, 445),
-		UDim2.fromOffset(130, 38),
-		Color3.fromRGB(48, 54, 48),
-		(UIAssetConfig.Tooltip or {}).BackgroundImage,
-		80
-	)
-	tooltip.Visible = false
-
-	local label = createBoxLabel(tooltip, "TooltipText", "+1", Enum.Font.GothamBold, Color3.fromRGB(255, 252, 220))
-	label.TextStrokeTransparency = 0.62
 
 	return tooltip
 end
@@ -887,18 +882,18 @@ local function createUpgradeCard(parent, upgradeId, index)
 	icon.ZIndex = 24
 	icon.Parent = iconBox
 
-	local title = createText(card, "Title", upgradeId, UDim2.fromOffset(150, 62), UDim2.fromOffset(205, 40), Enum.Font.GothamBold, Color3.fromRGB(245, 248, 230))
+	local title = createText(card, "Title", upgradeId, UDim2.fromOffset(150, 62), UDim2.fromOffset(205, 40), getGameFont(), Color3.fromRGB(245, 248, 230))
 	title.TextStrokeTransparency = 0.7
 	title.TextYAlignment = Enum.TextYAlignment.Center
 	title.ZIndex = 26
 
-	local level = createText(card, "Level", "0/0", UDim2.fromOffset(150, 108), UDim2.fromOffset(150, 36), Enum.Font.GothamBold, Color3.fromRGB(196, 212, 190))
+	local level = createText(card, "Level", "0/0", UDim2.fromOffset(150, 108), UDim2.fromOffset(150, 36), getGameFont(), Color3.fromRGB(196, 212, 190))
 	level.TextStrokeTransparency = 0.78
 	level.TextYAlignment = Enum.TextYAlignment.Center
 	level.ZIndex = 26
 
 	local valueBox = createTextBox(card, "ValueBox", UDim2.fromOffset(34, 180), UDim2.fromOffset(322, 110), Color3.fromRGB(38, 43, 39), assetConfig.ValueBoxBackground, 18)
-	local effect = createBoxLabel(valueBox, "Effect", "+1", Enum.Font.Arcade, Color3.fromRGB(250, 255, 232), {
+	local effect = createBoxLabel(valueBox, "Effect", "+1", getGameFont(), Color3.fromRGB(250, 255, 232), {
 		Position = UDim2.fromOffset(12, 14),
 		Size = UDim2.new(1, -24, 1, -28),
 		TextScaled = false,
@@ -908,14 +903,14 @@ local function createUpgradeCard(parent, upgradeId, index)
 	})
 
 	local priceBox = createTextBox(card, "PriceBox", UDim2.fromOffset(34, 318), UDim2.fromOffset(322, 64), Color3.fromRGB(44, 39, 31), assetConfig.PriceBoxBackground, 18)
-	local price = createBoxLabel(priceBox, "Price", "Price : 0 Coins", Enum.Font.GothamBlack, Color3.fromRGB(255, 235, 150), {
+	local price = createBoxLabel(priceBox, "Price", "Price : 0 Coins", getGameFont(), Color3.fromRGB(255, 235, 150), {
 		TextSize = 30,
 		MinTextSize = 16,
 		MaxTextSize = 32,
 		TextStrokeTransparency = 0.58,
 	})
 
-	local tooltip = createTooltip(card)
+	local tooltip = createTooltip(card, assetConfig)
 
 	local buyButton = Instance.new("ImageButton")
 	buyButton.Name = "Buy"
@@ -1035,7 +1030,7 @@ local function setupUpgradeBoard()
 	addStroke(background, Color3.fromRGB(190, 235, 135), 2, 0.2)
 	addGradient(background, Color3.fromRGB(28, 32, 30), Color3.fromRGB(5, 6, 6), 90)
 
-	local title = createText(background, "Title", "Coin Upgrades", UDim2.fromOffset(36, 24), UDim2.new(1, -72, 0, 70), Enum.Font.GothamBold, Color3.fromRGB(225, 245, 190))
+	local title = createText(background, "Title", "Coin Upgrades", UDim2.fromOffset(36, 24), UDim2.new(1, -72, 0, 70), getGameFont(), Color3.fromRGB(225, 245, 190))
 	title.TextXAlignment = Enum.TextXAlignment.Center
 	title.TextStrokeTransparency = 0.55
 
@@ -1085,7 +1080,7 @@ local function setupUpgradeBoard()
 	layout.VerticalAlignment = Enum.VerticalAlignment.Top
 	layout.Parent = cardsContainer
 
-	for index, upgradeId in UPGRADE_ORDER do
+	for index, upgradeId in ipairs(UPGRADE_ORDER) do
 		createUpgradeCard(cardsContainer, upgradeId, index)
 	end
 
@@ -1104,7 +1099,7 @@ function updateUpgradeBoard(data)
 		return
 	end
 
-	for upgradeId, card in upgradeCards do
+	for upgradeId, card in pairs(upgradeCards) do
 		local upgradeData = data.Upgrades[upgradeId]
 
 		if upgradeData then
