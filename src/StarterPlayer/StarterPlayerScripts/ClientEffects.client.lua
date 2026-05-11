@@ -1,6 +1,5 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
@@ -24,9 +23,6 @@ local NOTIFICATION_CONFIG = {
 	},
 }
 
-local ROTATION_SPEED = math.rad(30)
-local FLOAT_HEIGHT = 0.45
-local FLOAT_SPEED = 2.2
 local UPGRADE_ORDER = { "CoinGain", "MultiCoins", "MaxSpawnCoins" }
 local CARD_WIDTH = 430
 local CARD_HEIGHT = 320
@@ -38,7 +34,6 @@ local buyUpgradeRemote = remotes:WaitForChild("BuyUpgrade")
 local upgradeResultRemote = remotes:WaitForChild("UpgradeResult")
 local syncPlayerDataRemote = remotes:WaitForChild("SyncPlayerData")
 
-local animatedCoins = {}
 local latestPlayerData
 local upgradeCards = {}
 local notificationCount = 0
@@ -152,71 +147,22 @@ local function addGradient(parent, colorA, colorB, rotation)
 	return gradient
 end
 
-local function isAnimatableCoin(instance)
-	return (instance:IsA("BasePart") or instance:IsA("Model")) and instance:GetAttribute("IsCoin") == true
-end
+local function destroyLegacyGuiObject(instance, playerGui)
+	local current = instance
+	local candidate = instance
 
-local function stopAnimatingCoin(coin)
-	animatedCoins[coin] = nil
-end
-
-local function startAnimatingCoin(coin)
-	if animatedCoins[coin] or not isAnimatableCoin(coin) then
-		return
-	end
-
-	local isModel = coin:IsA("Model")
-	local baseCFrame
-
-	if isModel then
-		baseCFrame = coin:GetPivot()
-	elseif coin:IsA("BasePart") then
-		baseCFrame = coin.CFrame
-	else
-		return
-	end
-
-	animatedCoins[coin] = true
-
-	task.spawn(function()
-		local startTime = os.clock()
-		local phase = math.random() * math.pi * 2
-
-		while animatedCoins[coin] and coin.Parent and coin:GetAttribute("IsCoin") == true do
-			local t = os.clock() - startTime
-			local floatOffset = math.sin((t * FLOAT_SPEED) + phase) * FLOAT_HEIGHT
-			local rotation = t * ROTATION_SPEED
-			local success
-
-			if isModel then
-				success = pcall(function()
-					coin:PivotTo(baseCFrame * CFrame.new(0, floatOffset, 0) * CFrame.Angles(0, rotation, 0))
-				end)
-			elseif coin:IsA("BasePart") then
-				local basePosition = baseCFrame.Position
-				success = pcall(function()
-					coin.CFrame = CFrame.new(basePosition + Vector3.new(0, floatOffset, 0)) * CFrame.Angles(0, rotation, 0)
-				end)
-			else
-				success = false
-			end
-
-			if not success then
-				break
-			end
-
-			RunService.RenderStepped:Wait()
+	while current and current.Parent and current.Parent ~= playerGui do
+		if current:IsA("GuiObject") then
+			candidate = current
 		end
 
-		stopAnimatingCoin(coin)
-	end)
-end
+		current = current.Parent
+	end
 
-local function scanForCoins(container)
-	for _, descendant in container:GetDescendants() do
-		if isAnimatableCoin(descendant) then
-			startAnimatingCoin(descendant)
-		end
+	if current and current:IsA("ScreenGui") and current.Name ~= "ClientEffectsGui" then
+		current:Destroy()
+	elseif candidate and candidate.Name ~= "CoinPickupPopup" then
+		candidate:Destroy()
 	end
 end
 
@@ -238,6 +184,19 @@ local function cleanupLegacyCoinPickupEffects()
 
 		if child:IsA("ScreenGui") and child.Name ~= "ClientEffectsGui" and looksLikeLegacyCoinEffect then
 			child:Destroy()
+		end
+	end
+
+	for _, descendant in playerGui:GetDescendants() do
+		if descendant:IsA("TextLabel") or descendant:IsA("TextButton") or descendant:IsA("TextBox") then
+			local text = string.lower(tostring(descendant.Text))
+			local lowerName = string.lower(descendant.Name)
+			local hasLegacyTotalText = string.find(text, "coins") and string.find(text, "total")
+			local hasLegacyNilText = string.find(text, "nil") and (string.find(text, "coin") or string.find(lowerName, "coin"))
+
+			if hasLegacyTotalText or hasLegacyNilText then
+				destroyLegacyGuiObject(descendant, playerGui)
+			end
 		end
 	end
 end
@@ -886,12 +845,11 @@ local function setupUpgradeBoard()
 	cardsFrame.Parent = background
 
 	local layout = Instance.new("UIGridLayout")
-	layout.CellPadding = UDim2.fromOffset(28, 12)
+	layout.CellPadding = UDim2.fromOffset(28, 14)
 	layout.CellSize = UDim2.fromOffset(CARD_WIDTH, CARD_HEIGHT)
 	layout.FillDirection = Enum.FillDirection.Horizontal
 	layout.FillDirectionMaxCells = 3
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	layout.Padding = UDim.new(0, 14)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.VerticalAlignment = Enum.VerticalAlignment.Center
 	layout.Parent = cardsFrame
@@ -933,22 +891,13 @@ local function updateUpgradeBoard(data)
 	end
 end
 
-Workspace.DescendantAdded:Connect(function(descendant)
-	if isAnimatableCoin(descendant) then
-		startAnimatingCoin(descendant)
-		return
-	end
-
-	descendant:GetAttributeChangedSignal("IsCoin"):Connect(function()
-		if isAnimatableCoin(descendant) then
-			startAnimatingCoin(descendant)
-		end
-	end)
-end)
-
 
 coinCollectedEffect.OnClientEvent:Connect(function(amount)
+	print("[CoinCollectedEffect handler] ClientEffects")
+	cleanupLegacyCoinPickupEffects()
 	showCoinPickupPopup(amount)
+	task.defer(cleanupLegacyCoinPickupEffects)
+	task.delay(0.15, cleanupLegacyCoinPickupEffects)
 end)
 
 upgradeResultRemote.OnClientEvent:Connect(function(result)
@@ -979,4 +928,3 @@ end)
 
 getOrCreateScreenGui()
 setupUpgradeBoard()
-scanForCoins(Workspace)
