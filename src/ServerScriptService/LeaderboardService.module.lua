@@ -191,12 +191,16 @@ local function setupBoard()
 		surfaceGui = Instance.new("SurfaceGui")
 		surfaceGui.Name = "LeaderboardSurfaceGui"
 		surfaceGui.Face = Enum.NormalId.Front
-		surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-		surfaceGui.PixelsPerStud = 70
+		surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+		surfaceGui.CanvasSize = Vector2.new(1400, 800)
+		surfaceGui.PixelsPerStud = 75
 		surfaceGui.LightInfluence = 0
 		surfaceGui.Parent = boardPart
 	else
 		surfaceGui:ClearAllChildren()
+		surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+		surfaceGui.CanvasSize = Vector2.new(1400, 800)
+		surfaceGui.PixelsPerStud = 75
 	end
 
 	rowLabels = {}
