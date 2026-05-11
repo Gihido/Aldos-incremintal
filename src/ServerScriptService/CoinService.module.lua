@@ -157,7 +157,7 @@ local function getActiveCoinCount()
 
 	for coin in pairs(activeCoins) do
 		if coin.Parent then
-			activeCount += 1
+			activeCount = activeCount + 1
 		else
 			removeActiveCoin(coin)
 		end
@@ -263,7 +263,7 @@ local function createParticleBurst(parent, name, color, emitCount, lifetimeMin, 
 	attachment.Parent = parent
 
 	local emitter = Instance.new("ParticleEmitter")
-	emitter.Name = `{name}Emitter`
+	emitter.Name = name .. "Emitter"
 	emitter.Color = ColorSequence.new(color)
 	emitter.LightEmission = 0.75
 	emitter.Lifetime = NumberRange.new(lifetimeMin, lifetimeMax)
@@ -326,7 +326,7 @@ local function moveCoinToward(coin, targetCFrame, duration, easingStyle, easingD
 
 	while coin.Parent and elapsed < duration do
 		local deltaTime = RunService.Heartbeat:Wait()
-		elapsed += deltaTime
+		elapsed = elapsed + deltaTime
 
 		local alpha = math.clamp(elapsed / duration, 0, 1)
 
@@ -377,11 +377,12 @@ local function chaseCoinToPlayer(player, coin, amount)
 		end
 	end)
 
-		if distance > 0 then
+		if distance > 0.001 then
 			local step = math.min(distance, speed * deltaTime)
-			local newPosition = currentPosition + direction.Unit * step
-			rotation += deltaTime * speed * 0.2
-			setCoinCFrame(coin, CFrame.new(newPosition) * CFrame.Angles(rotation, rotation * 0.7, 0))
+			local newPosition = currentPosition + (direction.Unit * step)
+			rotation = rotation + (deltaTime * speed * 0.2)
+			local chaseCFrame = CFrame.new(newPosition) * CFrame.Angles(0, rotation, 0)
+			setCoinCFrame(coin, chaseCFrame)
 		end
 	end
 end
