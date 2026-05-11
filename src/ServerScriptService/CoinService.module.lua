@@ -526,7 +526,10 @@ spawnCoin = function()
 	styleCoin(coin)
 	setCoinCFrame(coin, getRandomCoinCFrame())
 
-	local coinParts = getCoinParts(coin)
+	return math.abs(localPosition.X) <= halfSize.X + margin
+		and math.abs(localPosition.Y) <= halfSize.Y + 5
+		and math.abs(localPosition.Z) <= halfSize.Z + margin
+end
 
 	if #coinParts == 0 or not getCoinRootPart(coin) then
 		warn("Spawned coin has no BasePart to collect or animate")
