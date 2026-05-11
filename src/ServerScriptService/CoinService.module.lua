@@ -254,27 +254,74 @@ local function createWhiteCoinImpact(player)
 		return
 	end
 
-	local attachment = Instance.new("Attachment")
-	attachment.Name = "CoinImpactEffect"
-	attachment.Parent = root
+	local impactPosition = root.Position + Vector3.new(0, 1.25, 0)
+	local orb = Instance.new("Part")
+	orb.Name = "CoinImpactWhiteOrb"
+	orb.Anchored = true
+	orb.CanCollide = false
+	orb.CanQuery = false
+	orb.CanTouch = false
+	orb.CastShadow = false
+	orb.Color = Color3.fromRGB(255, 255, 255)
+	orb.Material = Enum.Material.Neon
+	orb.Shape = Enum.PartType.Ball
+	orb.Size = Vector3.new(1.05, 1.05, 1.05)
+	orb.Transparency = 0.22
+	orb.CFrame = CFrame.new(impactPosition)
+	orb.Parent = Workspace
 
-	local emitter = Instance.new("ParticleEmitter")
-	emitter.Name = "CoinImpactEffectEmitter"
-	emitter.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
-	emitter.LightEmission = 0.75
-	emitter.Lifetime = NumberRange.new(0.22, 0.45)
-	emitter.Rate = 0
-	emitter.Speed = NumberRange.new(6, 12)
-	emitter.SpreadAngle = Vector2.new(360, 360)
-	emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
-	emitter.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.08),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-	emitter.Parent = attachment
-	emitter:Emit(22)
+	TweenService:Create(orb, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = Vector3.new(3, 3, 3),
+		Transparency = 1,
+	}):Play()
+	Debris:AddItem(orb, 0.35)
 
-	Debris:AddItem(attachment, 0.9)
+	local ring = Instance.new("Part")
+	ring.Name = "CoinImpactSilverRing"
+	ring.Anchored = true
+	ring.CanCollide = false
+	ring.CanQuery = false
+	ring.CanTouch = false
+	ring.CastShadow = false
+	ring.Color = Color3.fromRGB(235, 235, 235)
+	ring.Material = Enum.Material.Neon
+	ring.Shape = Enum.PartType.Cylinder
+	ring.Size = Vector3.new(0.08, 1.1, 1.1)
+	ring.Transparency = 0.28
+	ring.CFrame = CFrame.new(impactPosition) * CFrame.Angles(0, 0, math.rad(90))
+	ring.Parent = Workspace
+
+	TweenService:Create(ring, TweenInfo.new(0.32, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = Vector3.new(0.08, 4.2, 4.2),
+		Transparency = 1,
+	}):Play()
+	Debris:AddItem(ring, 0.4)
+
+	for index = 1, 8 do
+		local angle = (math.pi * 2 * index) / 8
+		local direction = Vector3.new(math.cos(angle), 0.18, math.sin(angle)).Unit
+		local spark = Instance.new("Part")
+		spark.Name = "CoinImpactLightSpark"
+		spark.Anchored = true
+		spark.CanCollide = false
+		spark.CanQuery = false
+		spark.CanTouch = false
+		spark.CastShadow = false
+		spark.Color = Color3.fromRGB(245, 245, 245)
+		spark.Material = Enum.Material.Neon
+		spark.Shape = Enum.PartType.Ball
+		spark.Size = Vector3.new(0.14, 0.14, 0.14)
+		spark.Transparency = 0.15
+		spark.CFrame = CFrame.new(impactPosition)
+		spark.Parent = Workspace
+
+		TweenService:Create(spark, TweenInfo.new(0.24, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			CFrame = CFrame.new(impactPosition + (direction * 1.45)),
+			Size = Vector3.new(0.05, 0.05, 0.05),
+			Transparency = 1,
+		}):Play()
+		Debris:AddItem(spark, 0.3)
+	end
 end
 
 local function getServerMaxActiveCoins()
