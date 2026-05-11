@@ -10,9 +10,12 @@ local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local collectZoneStateRemote = remotes:WaitForChild("CollectZoneState")
 
-local currentSize = 6
-local isVisible = false
+local currentSize = 3
+local isActive = false
 local squarePart
+local surfaceGui
+local imageLabel
+local outline
 local followConnection
 
 local function hasCustomAssetId(assetId)
@@ -46,6 +49,10 @@ end
 
 local function createCollectSquare()
 	if squarePart then
+		if not squarePart.Parent then
+			squarePart.Parent = Workspace
+		end
+
 		return squarePart
 	end
 
@@ -59,76 +66,88 @@ local function createCollectSquare()
 	squarePart.Color = Color3.fromRGB(130, 130, 130)
 	squarePart.Material = Enum.Material.Neon
 	squarePart.Size = Vector3.new(currentSize, 0.05, currentSize)
-	squarePart.Transparency = 0.72
+	squarePart.Transparency = 1
 	squarePart.Parent = Workspace
 
-	local surfaceGui = Instance.new("SurfaceGui")
+	surfaceGui = Instance.new("SurfaceGui")
 	surfaceGui.Name = "CollectSquareSurface"
+	surfaceGui.Enabled = false
 	surfaceGui.Face = Enum.NormalId.Top
 	surfaceGui.LightInfluence = 0
 	surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 	surfaceGui.PixelsPerStud = 72
 	surfaceGui.Parent = squarePart
 
-	local image = Instance.new("ImageLabel")
-	image.Name = "CollectSquareImage"
-	image.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
-	image.BackgroundTransparency = 0.35
-	image.BorderSizePixel = 0
-	image.Image = hasCustomAssetId((UIAssetConfig.CollectZone or {}).BackgroundImage) and UIAssetConfig.CollectZone.BackgroundImage or ""
-	image.ImageTransparency = hasCustomAssetId(image.Image) and 0.08 or 1
-	image.Position = UDim2.fromScale(0, 0)
-	image.ScaleType = Enum.ScaleType.Stretch
-	image.Size = UDim2.fromScale(1, 1)
-	image.ZIndex = 1
-	image.Parent = surfaceGui
+	imageLabel = Instance.new("ImageLabel")
+	imageLabel.Name = "CollectSquareImage"
+	imageLabel.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+	imageLabel.BackgroundTransparency = 0.35
+	imageLabel.BorderSizePixel = 0
+	imageLabel.Image = hasCustomAssetId((UIAssetConfig.CollectZone or {}).BackgroundImage) and UIAssetConfig.CollectZone.BackgroundImage or ""
+	imageLabel.ImageTransparency = hasCustomAssetId(imageLabel.Image) and 0.08 or 1
+	imageLabel.Position = UDim2.fromScale(0, 0)
+	imageLabel.ScaleType = Enum.ScaleType.Stretch
+	imageLabel.Size = UDim2.fromScale(1, 1)
+	imageLabel.ZIndex = 1
+	imageLabel.Parent = surfaceGui
 
-	createEdge(image, "TopEdge", UDim2.fromScale(0, 0), UDim2.new(1, 0, 0, 8))
-	createEdge(image, "BottomEdge", UDim2.new(0, 0, 1, -8), UDim2.new(1, 0, 0, 8))
-	createEdge(image, "LeftEdge", UDim2.fromScale(0, 0), UDim2.new(0, 8, 1, 0))
-	createEdge(image, "RightEdge", UDim2.new(1, -8, 0, 0), UDim2.new(0, 8, 1, 0))
+	createEdge(imageLabel, "TopEdge", UDim2.fromScale(0, 0), UDim2.new(1, 0, 0, 8))
+	createEdge(imageLabel, "BottomEdge", UDim2.new(0, 0, 1, -8), UDim2.new(1, 0, 0, 8))
+	createEdge(imageLabel, "LeftEdge", UDim2.fromScale(0, 0), UDim2.new(0, 8, 1, 0))
+	createEdge(imageLabel, "RightEdge", UDim2.new(1, -8, 0, 0), UDim2.new(0, 8, 1, 0))
 
-	local selection = Instance.new("SelectionBox")
-	selection.Name = "CollectSquareOutline"
-	selection.Adornee = squarePart
-	selection.Color3 = Color3.fromRGB(255, 255, 245)
-	selection.LineThickness = 0.05
-	selection.SurfaceTransparency = 1
-	selection.Transparency = 0.05
-	selection.Parent = squarePart
+	outline = Instance.new("SelectionBox")
+	outline.Name = "CollectSquareOutline"
+	outline.Adornee = squarePart
+	outline.Color3 = Color3.fromRGB(255, 255, 245)
+	outline.LineThickness = 0.05
+	outline.SurfaceTransparency = 1
+	outline.Transparency = 1
+	outline.Parent = squarePart
 
 	return squarePart
 end
 
+local function setVisualActive(active)
+	createCollectSquare()
+
+	squarePart.Transparency = active and 0.72 or 1
+
+	if surfaceGui then
+		surfaceGui.Enabled = active
+	end
+
+	if outline then
+		outline.Transparency = active and 0.05 or 1
+	end
+end
+
 local function updateSquarePosition()
-	if not isVisible or not squarePart then
+	if not isActive then
 		return
 	end
 
+	createCollectSquare()
 	local root = getPlayerRoot()
 
 	if not root then
-		squarePart.Transparency = 1
+		setVisualActive(false)
 		return
 	end
 
-	squarePart.Transparency = 0.72
+	setVisualActive(true)
 	squarePart.Size = Vector3.new(currentSize, 0.05, currentSize)
 	squarePart.CFrame = CFrame.new(root.Position.X, root.Position.Y - 2.85, root.Position.Z)
 end
 
 local function setSquareVisible(visible, size)
-	isVisible = visible
 	currentSize = size or currentSize
+	isActive = visible == true
+	createCollectSquare()
+	setVisualActive(isActive)
 
-	if visible then
-		createCollectSquare()
+	if isActive then
 		updateSquarePosition()
-	else
-		if squarePart then
-			squarePart:Destroy()
-			squarePart = nil
-		end
 	end
 end
 
@@ -141,6 +160,8 @@ followConnection = RunService.RenderStepped:Connect(updateSquarePosition)
 player.CharacterRemoving:Connect(function()
 	setSquareVisible(false)
 end)
+
+createCollectSquare()
 
 script.Destroying:Connect(function()
 	if followConnection then
