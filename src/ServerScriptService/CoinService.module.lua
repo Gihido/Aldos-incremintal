@@ -39,7 +39,7 @@ local function getCoinParts(coin)
 	local parts = {}
 
 	if coin:IsA("Model") then
-		for _, descendant in coin:GetDescendants() do
+		for _, descendant in ipairs(coin:GetDescendants()) do
 			if descendant:IsA("BasePart") then
 				table.insert(parts, descendant)
 			end
@@ -73,6 +73,14 @@ local function setCoinCFrame(coin, cframe)
 	end
 end
 
+local function removeCoinGridDecor(coin)
+	for _, child in ipairs(coin:GetDescendants()) do
+		if string.find(child.Name, "GridLine") then
+			child:Destroy()
+		end
+	end
+end
+
 local function getRandomCoinCFrame()
 	local halfSize = zonePart.Size * 0.5
 	local x = random:NextNumber(-halfSize.X, halfSize.X)
@@ -86,7 +94,7 @@ local function styleCoin(coin)
 	coin:SetAttribute("IsCoin", true)
 	coin:SetAttribute("Collected", false)
 
-	for _, part in getCoinParts(coin) do
+	for _, part in ipairs(getCoinParts(coin)) do
 		part.Anchored = true
 		part.CanCollide = false
 		part.CanTouch = true
@@ -111,7 +119,7 @@ end
 local function getActiveCoinCount()
 	local activeCount = 0
 
-	for coin in activeCoins do
+	for coin in pairs(activeCoins) do
 		if coin.Parent then
 			activeCount += 1
 		else
@@ -133,6 +141,7 @@ local function spawnCoin()
 
 	local coin = coinTemplate:Clone()
 	coin.Name = "Coin"
+	removeCoinGridDecor(coin)
 	styleCoin(coin)
 	setCoinCFrame(coin, getRandomCoinCFrame())
 	coin.Parent = Workspace
@@ -174,7 +183,7 @@ local function spawnCoin()
 		end)
 	end
 
-	for _, part in coinParts do
+	for _, part in ipairs(coinParts) do
 		part.Touched:Connect(function(hit)
 			local player = getPlayerFromHit(hit)
 
