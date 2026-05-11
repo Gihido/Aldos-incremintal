@@ -10,6 +10,8 @@ local REMOTE_NAMES = {
 	"AdminResult",
 	"InventoryAction",
 	"SyncInventory",
+	"PackTraderAction",
+	"SyncPackTrader",
 }
 
 local function getOrCreateRemotes()
@@ -75,6 +77,7 @@ local BillboardStatsService = safeRequire("BillboardStatsService")
 local ItemService = safeRequire("ItemService")
 local CoinService = safeRequire("CoinService")
 local AdminService = safeRequire("AdminService")
+local PackTraderService = safeRequire("PackTraderService")
 
 if DataService then
 	safeInit("DataService", function()
@@ -115,5 +118,11 @@ end
 if AdminService then
 	safeInit("AdminService", function()
 		AdminService.Init(remotes)
+	end)
+end
+
+if PackTraderService then
+	safeInit("PackTraderService", function()
+		PackTraderService.Init(remotes)
 	end)
 end

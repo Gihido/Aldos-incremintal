@@ -55,8 +55,17 @@ local function buildBuffsPayload(player)
 end
 
 local function buildPayload(player, resultType, message)
+	local itemOrder = {}
+
+	if type(DataService.GetItemOrder) == "function" then
+		for _, itemId in ipairs(DataService.GetItemOrder(player)) do
+			table.insert(itemOrder, itemId)
+		end
+	end
+
 	return {
 		Items = buildItemsPayload(player),
+		ItemOrder = itemOrder,
 		ActiveBuffs = buildBuffsPayload(player),
 		TotalCoinMultiplier = ItemService.GetCoinBuffMultiplier(player),
 		ResultType = resultType,

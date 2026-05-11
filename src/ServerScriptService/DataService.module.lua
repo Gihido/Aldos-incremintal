@@ -22,6 +22,7 @@ local DEFAULT_DATA = {
 			Tomato = 1,
 			Corn = 1,
 		},
+		ItemOrder = { "Carrot", "Cucumber", "Tomato", "Corn" },
 		ActiveBuffs = {},
 	},
 }
@@ -56,6 +57,58 @@ local function sanitizeNumber(value, fallback)
 	return number
 end
 
+local function hasDefaultItem(itemId)
+	return DEFAULT_DATA.Inventory.Items[itemId] ~= nil
+end
+
+local function removeFromItemOrder(itemOrder, itemId)
+	for index = #itemOrder, 1, -1 do
+		if itemOrder[index] == itemId then
+			table.remove(itemOrder, index)
+		end
+	end
+end
+
+local function appendToItemOrder(itemOrder, itemId)
+	if not hasDefaultItem(itemId) then
+		return
+	end
+
+	for _, existingItemId in ipairs(itemOrder) do
+		if existingItemId == itemId then
+			return
+		end
+	end
+
+	table.insert(itemOrder, itemId)
+end
+
+local function sanitizeItemOrder(inventory)
+	local sanitizedOrder = {}
+	local seen = {}
+
+	if type(inventory.ItemOrder) == "table" then
+		for _, rawItemId in ipairs(inventory.ItemOrder) do
+			local itemId = tostring(rawItemId)
+
+			if hasDefaultItem(itemId) and not seen[itemId] and (inventory.Items[itemId] or 0) > 0 then
+				seen[itemId] = true
+				table.insert(sanitizedOrder, itemId)
+			end
+		end
+	end
+
+	for _, itemId in ipairs(DEFAULT_DATA.Inventory.ItemOrder) do
+		if not seen[itemId] and (inventory.Items[itemId] or 0) > 0 then
+			seen[itemId] = true
+			table.insert(sanitizedOrder, itemId)
+		end
+	end
+
+	inventory.ItemOrder = sanitizedOrder
+	return sanitizedOrder
+end
+
 local function mergeWithDefaults(savedData)
 	local data = deepCopy(DEFAULT_DATA)
 
@@ -83,6 +136,12 @@ local function mergeWithDefaults(savedData)
 				data.Inventory.Items[itemId] = math.max(0, math.floor(sanitizeNumber(savedData.Inventory.Items[itemId], defaultCount)))
 			end
 		end
+
+		if type(savedData.Inventory.ItemOrder) == "table" then
+			data.Inventory.ItemOrder = deepCopy(savedData.Inventory.ItemOrder)
+		end
+
+		sanitizeItemOrder(data.Inventory)
 
 		if type(savedData.Inventory.ActiveBuffs) == "table" then
 			local now = os.time()
@@ -214,6 +273,7 @@ function DataService.SpendCoins(player, amount)
 	end
 
 	data.Coins -= amount
+	updateLeaderstatsCoins(player)
 	return true
 end
 
@@ -240,6 +300,12 @@ local function ensureInventory(data)
 		data.Inventory.Items[itemId] = math.max(0, math.floor(sanitizeNumber(data.Inventory.Items[itemId], defaultCount)))
 	end
 
+	if type(data.Inventory.ItemOrder) ~= "table" then
+		data.Inventory.ItemOrder = deepCopy(DEFAULT_DATA.Inventory.ItemOrder)
+	end
+
+	sanitizeItemOrder(data.Inventory)
+
 	if type(data.Inventory.ActiveBuffs) ~= "table" then
 		data.Inventory.ActiveBuffs = {}
 	end
@@ -260,7 +326,12 @@ end
 function DataService.AddItem(player, itemId, amount)
 	local inventory = DataService.GetInventory(player)
 	local safeAmount = math.floor(sanitizeNumber(amount, 0))
-	inventory.Items[itemId] = math.min(999, math.max(0, (inventory.Items[itemId] or 0) + safeAmount))
+	local currentCount = inventory.Items[itemId] or 0
+	inventory.Items[itemId] = math.min(999, math.max(0, currentCount + safeAmount))
+
+	if currentCount <= 0 and inventory.Items[itemId] > 0 then
+		appendToItemOrder(inventory.ItemOrder, itemId)
+	end
 
 	return inventory.Items[itemId]
 end
@@ -272,7 +343,16 @@ function DataService.RemoveItem(player, itemId, amount)
 	local removed = math.min(currentCount, safeAmount)
 	inventory.Items[itemId] = currentCount - removed
 
+	if inventory.Items[itemId] <= 0 then
+		removeFromItemOrder(inventory.ItemOrder, itemId)
+	end
+
 	return removed, inventory.Items[itemId]
+end
+
+function DataService.GetItemOrder(player)
+	local inventory = DataService.GetInventory(player)
+	return inventory.ItemOrder
 end
 
 function DataService.GetActiveBuffs(player)

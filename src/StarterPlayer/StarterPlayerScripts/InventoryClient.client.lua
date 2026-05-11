@@ -58,6 +58,7 @@ end
 
 local latestInventoryData = {
 	Items = {},
+	ItemOrder = {},
 	ActiveBuffs = {},
 	TotalCoinMultiplier = 1,
 }
@@ -370,6 +371,29 @@ end
 
 local function getItemCount(itemId)
 	return (latestInventoryData.Items and latestInventoryData.Items[itemId]) or 0
+end
+
+local function getOrderedVisibleItemIds()
+	local ordered = {}
+	local seen = {}
+
+	if type(latestInventoryData.ItemOrder) == "table" then
+		for _, itemId in ipairs(latestInventoryData.ItemOrder) do
+			if ItemConfig[itemId] and not seen[itemId] and getItemCount(itemId) > 0 then
+				seen[itemId] = true
+				table.insert(ordered, itemId)
+			end
+		end
+	end
+
+	for _, itemId in ipairs(INVENTORY_ITEMS) do
+		if ItemConfig[itemId] and not seen[itemId] and getItemCount(itemId) > 0 then
+			seen[itemId] = true
+			table.insert(ordered, itemId)
+		end
+	end
+
+	return ordered
 end
 
 local function getItemIcon(itemId, forBuff)
@@ -766,9 +790,22 @@ end
 
 local function updateAllSlots()
 	local visibleIndex = 1
+	local orderedItemIds = getOrderedVisibleItemIds()
+	local visibleSet = {}
+
+	for _, itemId in ipairs(orderedItemIds) do
+		visibleSet[itemId] = true
+		visibleIndex = updateSlot(itemId, visibleIndex)
+	end
 
 	for _, itemId in ipairs(INVENTORY_ITEMS) do
-		visibleIndex = updateSlot(itemId, visibleIndex)
+		if not visibleSet[itemId] then
+			local slot = ui.ItemsScroll and ui.ItemsScroll:FindFirstChild(`Item_{itemId}`)
+			if slot then
+				slot.Visible = false
+				slotHoverStates[slot] = nil
+			end
+		end
 	end
 
 	local visibleItemCount = visibleIndex - 1
@@ -822,12 +859,7 @@ local function refreshItemInfo()
 	for _, button in ipairs({ ui.ActivateButton, ui.DeleteButton }) do
 		local buttonText = button and button:FindFirstChild("ButtonText")
 		if buttonText and (buttonText:IsA("TextLabel") or buttonText:IsA("TextButton")) then
-			buttonText.BackgroundTransparency = 1
-			buttonText.Position = UDim2.fromScale(0, 0)
-			buttonText.Size = UDim2.fromScale(1, 1)
-			buttonText.TextXAlignment = Enum.TextXAlignment.Center
-			buttonText.TextYAlignment = Enum.TextYAlignment.Center
-			applyResponsiveTextConstraint(buttonText, TEXT_SIZE_RULES.ButtonText)
+			buttonText.Visible = false
 		end
 	end
 
@@ -1110,7 +1142,11 @@ local function updateActiveBuffs(data)
 			if timeLabel and timeLabel:IsA("TextLabel") then
 				timeLabel.AnchorPoint = Vector2.new(0.5, 1)
 				timeLabel.BackgroundTransparency = 1
-				timeLabel.Position = UDim2.new(0.5, 0, 1, 4)
+				if getUIProfileName() == "Desktop" then
+					timeLabel.Position = UDim2.new(0.5, 0, 1, 4)
+				else
+					timeLabel.Position = UDim2.new(0.5, 0, 1, -2)
+				end
 				timeLabel.Size = UDim2.new(1, 0, 0, 22)
 				timeLabel.Text = formatRemaining(buff.Remaining or ((buff.EndTime or os.time()) - os.time()))
 				timeLabel.TextStrokeTransparency = 0.15
@@ -1146,6 +1182,7 @@ local function updateInventory(data)
 
 	latestInventoryData = data
 	latestInventoryData.Items = latestInventoryData.Items or {}
+	latestInventoryData.ItemOrder = latestInventoryData.ItemOrder or {}
 	latestInventoryData.ActiveBuffs = latestInventoryData.ActiveBuffs or {}
 	updateAllSlots()
 	refreshItemInfo()

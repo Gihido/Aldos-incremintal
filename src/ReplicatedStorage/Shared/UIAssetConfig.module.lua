@@ -101,12 +101,13 @@ local UIAssetConfig = {
 
 	Inventory = {
 		Main = {
-			ToggleButton = "rbxassetid://128844489893070",
-			Background = "rbxassetid://140022583234279",
+			ToggleButton = "rbxassetid://0",
+			Background = "rbxassetid://0",
 			CloseButton = "rbxassetid://0",
 
-			ItemsTabButton = "rbxassetid://128844489893070",
+			ItemsTabButton = "rbxassetid://0",
 			PassivesTabButton = "rbxassetid://0",
+			PackTraderTabButton = "rbxassetid://0",
 
 			ItemSlotBackground = "rbxassetid://0",
 			ItemInfoBackground = "rbxassetid://0",
@@ -120,27 +121,43 @@ local UIAssetConfig = {
 			BuffSlotBackground = "rbxassetid://0",
 		},
 
+		PackTrader = {
+			Background = "rbxassetid://0",
+			TraderImage = "rbxassetid://0",
+
+			DialogBackground = "rbxassetid://0",
+			AnswerButtonBackground = "rbxassetid://0",
+
+			OffersBackground = "rbxassetid://0",
+			OfferSlotBackground = "rbxassetid://0",
+
+			BuyButtonBackground = "rbxassetid://0",
+			BackButtonBackground = "rbxassetid://0",
+
+			TooltipBackground = "rbxassetid://0",
+		},
+
 		Items = {
 			Carrot = {
-				Icon = "rbxassetid://93674418075080",
-				SlotBackground = "rbxassetid://99587245115312",
-				InfoBackground = "rbxassetid://102755677512720",
-				TooltipBackground = "rbxassetid://107590106110073",
-				BuffTooltipBackground = "rbxassetid://107590106110073",
-				BuffIcon = "rbxassetid://95282308527722",
-				ActivateButtonBackground = "rbxassetid://77203308839827",
-				DeleteButtonBackground = "rbxassetid://129408383648107",
+				Icon = "rbxassetid://0",
+				SlotBackground = "rbxassetid://0",
+				InfoBackground = "rbxassetid://0",
+				TooltipBackground = "rbxassetid://0",
+				BuffTooltipBackground = "rbxassetid://0",
+				BuffIcon = "rbxassetid://0",
+				ActivateButtonBackground = "rbxassetid://0",
+				DeleteButtonBackground = "rbxassetid://0",
 			},
 
 			Cucumber = {
-				Icon = "rbxassetid://88418733093660",
-				SlotBackground = "rbxassetid://102760269801253",
-				InfoBackground = "rbxassetid://133093722280631",
-				TooltipBackground = "rbxassetid://82336640510983",
-				BuffTooltipBackground = "rbxassetid://82336640510983",
-				BuffIcon = "rbxassetid://73492989732472",
-				ActivateButtonBackground = "rbxassetid://77203308839827",
-				DeleteButtonBackground = "rbxassetid://129408383648107",
+				Icon = "rbxassetid://0",
+				SlotBackground = "rbxassetid://0",
+				InfoBackground = "rbxassetid://0",
+				TooltipBackground = "rbxassetid://0",
+				BuffTooltipBackground = "rbxassetid://0",
+				BuffIcon = "rbxassetid://0",
+				ActivateButtonBackground = "rbxassetid://0",
+				DeleteButtonBackground = "rbxassetid://0",
 			},
 
 			Tomato = {
