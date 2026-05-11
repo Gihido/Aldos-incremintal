@@ -41,6 +41,8 @@ local notificationCount = 0
 local responsiveScaleConnections = {}
 local pendingPurchaseEffectUpgradeId
 local pendingPurchaseEffectButton
+local upgradeGuiReady = false
+local updateUpgradeBoard
 
 local function getPlayerGui()
 	return player:WaitForChild("PlayerGui")
@@ -138,6 +140,24 @@ end
 
 local function getNotificationAssetConfig(notificationType)
 	return (UIAssetConfig.Notifications and UIAssetConfig.Notifications[notificationType]) or {}
+end
+
+local function getButtonImage(assetConfig, mode)
+	if mode == "BuyMax" then
+		return assetConfig.BuyMaxButtonImage or assetConfig.BuyMaxButtonBackground
+	end
+
+	return assetConfig.BuyButtonImage or assetConfig.BuyButtonBackground
+end
+
+local function setTextSafe(obj, value, labelName, upgradeId)
+	if obj and (obj:IsA("TextLabel") or obj:IsA("TextButton")) then
+		obj.Text = value
+		return true
+	end
+
+	warn(`{labelName or "TextLabel"} missing for {upgradeId or "upgrade card"}`)
+	return false
 end
 
 local function addGradient(parent, colorA, colorB, rotation)
@@ -512,32 +532,40 @@ local function hideTooltip(tooltip)
 	tooltip.Visible = false
 end
 
-local function styleButton(button, colorA, colorB, strokeColor, textColor, backgroundImage)
+local function styleButton(button, colorA, colorB, strokeColor, textColor, buttonImage, fallbackText)
+	local hasButtonImage = hasCustomAssetId(buttonImage)
+
 	button.AutoButtonColor = false
 	button.BackgroundColor3 = colorB
-	button.BackgroundTransparency = hasCustomAssetId(backgroundImage) and 1 or 0.03
+	button.BackgroundTransparency = 1
 	button.BorderSizePixel = 0
-	button.Text = ""
-	button.TextTransparency = 1
+	button.Image = hasButtonImage and buttonImage or ""
+	button.ImageColor3 = Color3.fromRGB(255, 255, 255)
+	button.ImageTransparency = hasButtonImage and 0 or 1
+	button.ScaleType = Enum.ScaleType.Stretch
 	button.ZIndex = 30
 	button.ClipsDescendants = true
-	button:SetAttribute("UsesImageBackground", hasCustomAssetId(backgroundImage))
+	button:SetAttribute("UsesImageBackground", hasButtonImage)
 	local stroke = addStroke(button, strokeColor, 2, 0.1)
-	addGradient(button, colorA, colorB, 90)
-	addImageBackground(button, backgroundImage, 0.03, 0.95)
+
+	if not hasButtonImage then
+		button.BackgroundTransparency = 0.03
+		addGradient(button, colorA, colorB, 90)
+	end
 
 	local label = Instance.new("TextLabel")
-	label.Name = "ButtonText"
+	label.Name = "FallbackText"
 	label.BackgroundTransparency = 1
 	label.BorderSizePixel = 0
 	label.Font = Enum.Font.GothamBold
 	label.Position = UDim2.fromScale(0, 0)
 	label.Size = UDim2.fromScale(1, 1)
-	label.Text = button.Name == "BuyMax" and "Buy Max" or "Buy"
+	label.Text = fallbackText
 	label.TextColor3 = textColor
 	label.TextScaled = false
-	label.TextSize = button.Name == "BuyMax" and 28 or 32
+	label.TextSize = fallbackText == "Buy Max" and 28 or 32
 	label.TextStrokeTransparency = 0.72
+	label.Visible = not hasButtonImage
 	label.ZIndex = button.ZIndex + 5
 	label.Parent = button
 
@@ -553,20 +581,24 @@ local function styleButton(button, colorA, colorB, strokeColor, textColor, backg
 
 	button.MouseEnter:Connect(function()
 		stroke.Transparency = 0
+		button.ImageColor3 = Color3.fromRGB(255, 255, 255)
 		tweenScale(1.035)
 	end)
 
 	button.MouseLeave:Connect(function()
 		stroke.Transparency = 0.1
+		button.ImageColor3 = Color3.fromRGB(255, 255, 255)
 		tweenScale(1)
 	end)
 
 	button.MouseButton1Down:Connect(function()
 		stroke.Transparency = 0
+		button.ImageColor3 = Color3.fromRGB(230, 230, 230)
 		tweenScale(0.95)
 	end)
 
 	button.MouseButton1Up:Connect(function()
+		button.ImageColor3 = Color3.fromRGB(255, 255, 255)
 		tweenScale(1.025)
 	end)
 end
@@ -798,19 +830,19 @@ local function createUpgradeCard(parent, upgradeId, index)
 
 	local tooltip = createTooltip(card)
 
-	local buyButton = Instance.new("TextButton")
+	local buyButton = Instance.new("ImageButton")
 	buyButton.Name = "Buy"
 	buyButton.Position = UDim2.fromOffset(34, 500)
 	buyButton.Size = UDim2.fromOffset(130, 82)
 	buyButton.Parent = card
-	styleButton(buyButton, Color3.fromRGB(176, 226, 118), Color3.fromRGB(62, 142, 62), Color3.fromRGB(232, 255, 198), Color3.fromRGB(12, 28, 10), assetConfig.BuyButtonBackground)
+	styleButton(buyButton, Color3.fromRGB(176, 226, 118), Color3.fromRGB(62, 142, 62), Color3.fromRGB(232, 255, 198), Color3.fromRGB(12, 28, 10), getButtonImage(assetConfig, "Buy"), "Buy")
 
-	local buyMaxButton = Instance.new("TextButton")
+	local buyMaxButton = Instance.new("ImageButton")
 	buyMaxButton.Name = "BuyMax"
 	buyMaxButton.Position = UDim2.fromOffset(206, 500)
 	buyMaxButton.Size = UDim2.fromOffset(150, 82)
 	buyMaxButton.Parent = card
-	styleButton(buyMaxButton, Color3.fromRGB(242, 210, 132), Color3.fromRGB(128, 112, 82), Color3.fromRGB(255, 244, 205), Color3.fromRGB(255, 255, 245), assetConfig.BuyMaxButtonBackground)
+	styleButton(buyMaxButton, Color3.fromRGB(242, 210, 132), Color3.fromRGB(128, 112, 82), Color3.fromRGB(255, 244, 205), Color3.fromRGB(255, 255, 245), getButtonImage(assetConfig, "BuyMax"), "Buy Max")
 
 	local cardData = {
 		Frame = card,
@@ -924,16 +956,17 @@ local function setupUpgradeBoard()
 	cardsScroll.Name = "CardsScroll"
 	cardsScroll.Active = true
 	cardsScroll.BackgroundColor3 = Color3.fromRGB(12, 14, 13)
-	cardsScroll.BackgroundTransparency = 0.22
+	cardsScroll.BackgroundTransparency = 1
 	cardsScroll.BorderSizePixel = 0
-	cardsScroll.CanvasSize = UDim2.fromOffset((#UPGRADE_ORDER * CARD_WIDTH) + ((#UPGRADE_ORDER - 1) * CARD_PADDING) + 52, 0)
+	local totalCardsWidth = (#UPGRADE_ORDER * CARD_WIDTH) + ((#UPGRADE_ORDER - 1) * CARD_PADDING)
+	cardsScroll.CanvasSize = UDim2.fromOffset(totalCardsWidth + 80, 0)
 	cardsScroll.ClipsDescendants = true
 	cardsScroll.Position = UDim2.fromOffset(36, 90)
 	cardsScroll.ScrollingDirection = Enum.ScrollingDirection.X
 	cardsScroll.ScrollBarImageColor3 = Color3.fromRGB(210, 240, 170)
-	cardsScroll.ScrollBarImageTransparency = 0.15
+	cardsScroll.ScrollBarImageTransparency = 0
 	cardsScroll.ScrollBarThickness = 10
-	cardsScroll.Size = UDim2.new(1, -72, 0, 650)
+	cardsScroll.Size = UDim2.fromOffset(980, CARD_HEIGHT + 40)
 	cardsScroll.VerticalScrollBarInset = Enum.ScrollBarInset.None
 	cardsScroll.ZIndex = 5
 	cardsScroll.Parent = background
@@ -943,8 +976,8 @@ local function setupUpgradeBoard()
 	cardsContainer.Name = "CardsContainer"
 	cardsContainer.BackgroundTransparency = 1
 	cardsContainer.BorderSizePixel = 0
-	cardsContainer.Position = UDim2.fromOffset(24, 18)
-	cardsContainer.Size = UDim2.fromOffset((#UPGRADE_ORDER * CARD_WIDTH) + ((#UPGRADE_ORDER - 1) * CARD_PADDING), CARD_HEIGHT)
+	cardsContainer.Position = UDim2.fromOffset(0, 0)
+	cardsContainer.Size = UDim2.fromOffset(totalCardsWidth, CARD_HEIGHT)
 	cardsContainer.ZIndex = 6
 	cardsContainer.Parent = cardsScroll
 
@@ -959,12 +992,18 @@ local function setupUpgradeBoard()
 	for index, upgradeId in UPGRADE_ORDER do
 		createUpgradeCard(cardsContainer, upgradeId, index)
 	end
+
+	upgradeGuiReady = true
+
+	if latestPlayerData then
+		updateUpgradeBoard(latestPlayerData)
+	end
 end
 
-local function updateUpgradeBoard(data)
+function updateUpgradeBoard(data)
 	latestPlayerData = data
 
-	if not data or not data.Upgrades then
+	if not upgradeGuiReady or not data or not data.Upgrades then
 		return
 	end
 
@@ -972,23 +1011,30 @@ local function updateUpgradeBoard(data)
 		local upgradeData = data.Upgrades[upgradeId]
 
 		if upgradeData then
-			card.Title.Text = upgradeData.Name
-			card.Level.Text = `{upgradeData.Level}/{upgradeData.MaxLevel}`
-			card.Effect.Text = upgradeData.EffectText
-			card.BonusMini.Text = upgradeData.BuyMaxBonusText or "-"
+			setTextSafe(card.Title, upgradeData.Name, "Title", upgradeId)
+			setTextSafe(card.Level, `{upgradeData.Level}/{upgradeData.MaxLevel}`, "Level", upgradeId)
+			setTextSafe(card.Effect, upgradeData.EffectText, "Effect", upgradeId)
 
 			if upgradeData.IsMaxed then
-				card.Price.Text = "Price : Max"
-				card.Buy.AutoButtonColor = false
-				card.BuyMax.AutoButtonColor = false
-				card.Buy.BackgroundTransparency = card.Buy:GetAttribute("UsesImageBackground") and 1 or 0.45
-				card.BuyMax.BackgroundTransparency = card.BuyMax:GetAttribute("UsesImageBackground") and 1 or 0.45
+				setTextSafe(card.Price, "Price : Max", "Price", upgradeId)
+				if card.Buy then
+					card.Buy.AutoButtonColor = false
+					card.Buy.BackgroundTransparency = card.Buy:GetAttribute("UsesImageBackground") and 1 or 0.45
+				end
+				if card.BuyMax then
+					card.BuyMax.AutoButtonColor = false
+					card.BuyMax.BackgroundTransparency = card.BuyMax:GetAttribute("UsesImageBackground") and 1 or 0.45
+				end
 			else
-				card.Price.Text = `Price : {upgradeData.PriceFormatted} Coins`
-				card.Buy.AutoButtonColor = false
-				card.BuyMax.AutoButtonColor = false
-				card.Buy.BackgroundTransparency = card.Buy:GetAttribute("UsesImageBackground") and 1 or 0
-				card.BuyMax.BackgroundTransparency = card.BuyMax:GetAttribute("UsesImageBackground") and 1 or 0
+				setTextSafe(card.Price, `Price : {upgradeData.PriceFormatted} Coins`, "Price", upgradeId)
+				if card.Buy then
+					card.Buy.AutoButtonColor = false
+					card.Buy.BackgroundTransparency = card.Buy:GetAttribute("UsesImageBackground") and 1 or 0
+				end
+				if card.BuyMax then
+					card.BuyMax.AutoButtonColor = false
+					card.BuyMax.BackgroundTransparency = card.BuyMax:GetAttribute("UsesImageBackground") and 1 or 0
+				end
 			end
 		end
 	end

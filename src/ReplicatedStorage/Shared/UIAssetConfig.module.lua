@@ -8,6 +8,8 @@ local UIAssetConfig = {
 			ValueBoxBackground = "rbxassetid://0",
 			PriceBoxBackground = "rbxassetid://0",
 
+			BuyButtonImage = "rbxassetid://0",
+			BuyMaxButtonImage = "rbxassetid://0",
 			BuyButtonBackground = "rbxassetid://0",
 			BuyMaxButtonBackground = "rbxassetid://0",
 
@@ -21,6 +23,8 @@ local UIAssetConfig = {
 			ValueBoxBackground = "rbxassetid://0",
 			PriceBoxBackground = "rbxassetid://0",
 
+			BuyButtonImage = "rbxassetid://0",
+			BuyMaxButtonImage = "rbxassetid://0",
 			BuyButtonBackground = "rbxassetid://0",
 			BuyMaxButtonBackground = "rbxassetid://0",
 
@@ -34,6 +38,8 @@ local UIAssetConfig = {
 			ValueBoxBackground = "rbxassetid://0",
 			PriceBoxBackground = "rbxassetid://0",
 
+			BuyButtonImage = "rbxassetid://0",
+			BuyMaxButtonImage = "rbxassetid://0",
 			BuyButtonBackground = "rbxassetid://0",
 			BuyMaxButtonBackground = "rbxassetid://0",
 
