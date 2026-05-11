@@ -142,143 +142,6 @@ local function setCoinCFrame(coin, cframe)
 		local partOffset = rootCFrame:ToObjectSpace(part.CFrame)
 		part.CFrame = cframe * partOffset
 	end
-
-	syncPlayer(player)
-
-	removeActiveCoin(coin)
-	coin:Destroy()
-
-	scheduleCoinRespawn()
-end
-
-local function animateCoinToPosition(coin, targetPosition, duration)
-	local startedAt = os.clock()
-	local startCFrame = getCoinCFrame(coin)
-	local startPosition = startCFrame.Position
-
-	while coin and coin.Parent and os.clock() - startedAt < duration do
-		local alpha = math.clamp((os.clock() - startedAt) / duration, 0, 1)
-		local eased = 1 - ((1 - alpha) * (1 - alpha))
-		local position = startPosition:Lerp(targetPosition, eased)
-
-		setCoinCFrame(coin, CFrame.new(position))
-
-		RunService.Heartbeat:Wait()
-	end
-
-	if coin and coin.Parent then
-		setCoinCFrame(coin, CFrame.new(targetPosition))
-	end
-end
-
-local function runCoinChase(player, coin, amount)
-	local root = getPlayerRoot(player)
-
-	if not root then
-		cancelCollectedCoin(coin)
-		return
-	end
-
-	local startedAt = os.clock()
-	local speed = START_CHASE_SPEED
-	local rotation = 0
-
-	local startPosition = getCoinPosition(coin)
-	local awayDirection = startPosition - root.Position
-
-	if awayDirection.Magnitude < 0.1 then
-		awayDirection = Vector3.new(random:NextNumber() - 0.5, 0, random:NextNumber() - 0.5)
-	end
-
-	awayDirection = Vector3.new(awayDirection.X, 0, awayDirection.Z)
-
-	if awayDirection.Magnitude < 0.1 then
-		awayDirection = Vector3.new(1, 0, 0)
-	end
-
-	createCoinLaunchRingEffect(coin)
-
-	local liftPosition = startPosition + Vector3.new(0, 3, 0) + (awayDirection.Unit * 2)
-	animateCoinToPosition(coin, liftPosition, COIN_LAUNCH_SECONDS)
-
-	while coin and coin.Parent do
-		root = getPlayerRoot(player)
-
-		if not root then
-			cancelCollectedCoin(coin)
-			return
-		end
-
-		local currentPosition = getCoinPosition(coin)
-		local targetPosition = root.Position + Vector3.new(0, 1.2, 0)
-
-		local direction = targetPosition - currentPosition
-		local distance = direction.Magnitude
-
-		if distance <= HIT_DISTANCE then
-			finishCoinCollection(player, coin, amount)
-			return
-		end
-
-		local deltaTime = RunService.Heartbeat:Wait()
-
-		speed = math.min(MAX_CHASE_SPEED, speed + (CHASE_ACCELERATION * deltaTime))
-
-		if os.clock() - startedAt > CHASE_TIMEOUT_SECONDS then
-			speed = MAX_CHASE_SPEED
-		end
-
-		if direction.Magnitude > 0.001 then
-			local step = math.min(distance, speed * deltaTime)
-			local newPosition = currentPosition + (direction.Unit * step)
-
-			rotation += deltaTime * 12
-
-			local newCFrame =
-				CFrame.new(newPosition)
-				* CFrame.Angles(rotation, rotation * 0.7, rotation * 0.35)
-
-			setCoinCFrame(coin, newCFrame)
-		end
-	end
-end
-
-local function startCoinChasePlayer(player, coin, amount)
-	task.spawn(function()
-		local ok, err = pcall(function()
-			runCoinChase(player, coin, amount)
-		end)
-
-		if not ok then
-			warn("[CoinService] Coin chase failed:", err)
-			cancelCollectedCoin(coin)
-		end
-	end)
-end
-
-local function tryCollectCoinForPlayer(player, coin)
-	if not coin or not coin.Parent or coin:GetAttribute("Collected") then
-		return
-	end
-
-	print("[CoinService] Try collect:", player.Name, coin.Name)
-
-	local root = getPlayerRoot(player)
-
-	if not root or not isPlayerInsideZone(player) then
-		return
-	end
-
-	coin:SetAttribute("Collected", true)
-	coin:SetAttribute("IsCoin", false)
-
-	for _, part in ipairs(getCoinParts(coin)) do
-		part.CanTouch = false
-		part.CanQuery = false
-	end
-
-	local amount = getCoinsPerPickup(player)
-	startCoinChasePlayer(player, coin, amount)
 end
 
 local function removeActiveCoin(coin)
@@ -359,29 +222,29 @@ local function isCoinInsideCollectSquare(player, coin)
 		and math.abs(coinPosition.Y - root.Position.Y) <= 12
 end
 
-local function createCoinLaunchRingEffect(coin)
+local function createCoinLaunchBurstEffect(coin)
 	local coinPosition = getCoinPosition(coin)
-	local ring = Instance.new("Part")
-	ring.Name = "CoinLaunchRing"
-	ring.Anchored = true
-	ring.CanCollide = false
-	ring.CanQuery = false
-	ring.CanTouch = false
-	ring.CastShadow = false
-	ring.Color = RING_COLOR
-	ring.Material = Enum.Material.Neon
-	ring.Shape = Enum.PartType.Cylinder
-	ring.Size = Vector3.new(0.08, 0.35, 0.35)
-	ring.Transparency = 0.35
-	ring.CFrame = CFrame.new(coinPosition - Vector3.new(0, 0.25, 0)) * CFrame.Angles(0, 0, math.rad(90))
-	ring.Parent = Workspace
+	local burst = Instance.new("Part")
+	burst.Name = "CoinLaunchWhiteBurst"
+	burst.Anchored = true
+	burst.CanCollide = false
+	burst.CanQuery = false
+	burst.CanTouch = false
+	burst.CastShadow = false
+	burst.Color = Color3.fromRGB(255, 255, 255)
+	burst.Material = Enum.Material.Neon
+	burst.Shape = Enum.PartType.Ball
+	burst.Size = Vector3.new(0.35, 0.35, 0.35)
+	burst.Transparency = 0.25
+	burst.CFrame = CFrame.new(coinPosition)
+	burst.Parent = Workspace
 
-	local tween = TweenService:Create(ring, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Size = Vector3.new(0.08, 4.5, 4.5),
+	local tween = TweenService:Create(burst, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = Vector3.new(1.45, 1.45, 1.45),
 		Transparency = 1,
 	})
 	tween:Play()
-	Debris:AddItem(ring, 0.6)
+	Debris:AddItem(burst, 0.3)
 end
 
 local function createWhiteCoinImpact(player)
@@ -542,7 +405,7 @@ local function runCoinChase(player, coin, amount)
 		awayDirection = Vector3.new(1, 0, 0)
 	end
 
-	createCoinLaunchRingEffect(coin)
+	createCoinLaunchBurstEffect(coin)
 	local liftPosition = startPosition + Vector3.new(0, 3, 0) + (awayDirection.Unit * 2)
 	animateCoinToPosition(coin, liftPosition, COIN_LAUNCH_SECONDS)
 

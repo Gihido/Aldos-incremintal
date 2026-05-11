@@ -7,9 +7,20 @@ local ResponsiveUI = require(shared:WaitForChild("ResponsiveUI"))
 local UIAssetConfig = require(shared:WaitForChild("UIAssetConfig"))
 
 local ADMIN_NAME = "Doter24_7"
-local PANEL_DESKTOP_SIZE = Vector2.new(310, 360)
-local PANEL_MOBILE_SIZE = Vector2.new(260, 310)
-local PANEL_POSITION = UDim2.fromScale(0.98, 0.58)
+local UI_PROFILES = {
+	Desktop = {
+		PanelSize = Vector2.new(310, 360),
+		PanelScale = 1,
+		Position = UDim2.fromScale(0.98, 0.58),
+		OpenButtonSize = UDim2.fromOffset(78, 34),
+	},
+	Mobile = {
+		PanelSize = Vector2.new(260, 310),
+		PanelScale = 0.75,
+		Position = UDim2.fromScale(0.98, 0.58),
+		OpenButtonSize = UDim2.fromOffset(70, 32),
+	},
+}
 local PANEL_COLOR_TOP = Color3.fromRGB(55, 185, 255)
 local PANEL_COLOR_BOTTOM = Color3.fromRGB(16, 70, 190)
 local BUTTON_COLOR_TOP = Color3.fromRGB(190, 255, 70)
@@ -116,9 +127,12 @@ local function setPanelVisible(visible)
 	openButton.Visible = not visible
 end
 
+local function getUIProfile()
+	return ResponsiveUI.IsMobileLike() and UI_PROFILES.Mobile or UI_PROFILES.Desktop
+end
+
 local function getPanelSize()
-	local isMobile = ResponsiveUI.IsMobileLike()
-	local size = isMobile and PANEL_MOBILE_SIZE or PANEL_DESKTOP_SIZE
+	local size = getUIProfile().PanelSize
 
 	return UDim2.fromOffset(size.X, size.Y)
 end
@@ -129,7 +143,11 @@ local function updateScale()
 	end
 
 	if scaleObject then
-		scaleObject.Scale = ResponsiveUI.IsMobileLike() and 0.75 or 1
+		scaleObject.Scale = getUIProfile().PanelScale
+	end
+
+	if openButton then
+		openButton.Size = getUIProfile().OpenButtonSize
 	end
 end
 
@@ -188,7 +206,7 @@ local function createAdminPanel()
 	panel.AnchorPoint = Vector2.new(1, 0.5)
 	panel.BackgroundColor3 = PANEL_COLOR_TOP
 	panel.BorderSizePixel = 0
-	panel.Position = PANEL_POSITION
+	panel.Position = getUIProfile().Position
 	panel.Size = getPanelSize()
 	panel.ZIndex = 500
 	panel.Parent = screenGui
@@ -196,7 +214,7 @@ local function createAdminPanel()
 	addGradient(panel, PANEL_COLOR_TOP, PANEL_COLOR_BOTTOM)
 
 	scaleObject = Instance.new("UIScale")
-	scaleObject.Scale = ResponsiveUI.IsMobileLike() and 0.75 or 1
+	scaleObject.Scale = getUIProfile().PanelScale
 	scaleObject.Parent = panel
 
 	createTextLabel(panel, "Title", "Admin Panel", UDim2.fromOffset(14, 10), UDim2.new(1, -56, 0, 36), 24)
@@ -273,7 +291,7 @@ local function createAdminPanel()
 	statusLabel = createTextLabel(panel, "Status", "Ready", UDim2.fromOffset(14, 314), UDim2.new(1, -28, 0, 34), 14)
 	statusLabel.TextColor3 = Color3.fromRGB(205, 255, 170)
 
-	openButton = createButton(screenGui, "OpenAdmin", "Admin", UDim2.new(1, -92, 0.5, 130), UDim2.fromOffset(78, 34))
+	openButton = createButton(screenGui, "OpenAdmin", "Admin", UDim2.new(1, -92, 0.5, 130), getUIProfile().OpenButtonSize)
 	openButton.AnchorPoint = Vector2.new(1, 0.5)
 	openButton.ZIndex = 450
 	openButton.Visible = false

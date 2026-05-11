@@ -30,6 +30,59 @@ local CARD_PADDING = 22
 local CARD_SIDE_PADDING = 20
 local CARD_EXTRA_SCROLL_SPACE = 180
 
+local UI_PROFILES = {
+	Desktop = {
+		Notification = {
+			Width = 352,
+			Height = 92,
+			Padding = 14,
+			IconBoxSize = 62,
+			IconPadding = 6,
+			TextGap = 14,
+			TextSize = 24,
+			MinTextSize = 16,
+			MaxTextSize = 28,
+			TargetPosition = UDim2.fromScale(0.98, 0.08),
+			HiddenPosition = UDim2.fromScale(1.22, 0.08),
+		},
+		CoinPopup = {
+			Size = 74,
+			MinX = 0.12,
+			MaxX = 0.88,
+			StartY = 0.982,
+			StartJitter = 0.004,
+			PeakY = 0.84,
+			PeakJitter = 0.012,
+			MaxTextSize = 30,
+		},
+	},
+	Mobile = {
+		Notification = {
+			Width = 260,
+			Height = 68,
+			Padding = 10,
+			IconBoxSize = 46,
+			IconPadding = 5,
+			TextGap = 10,
+			TextSize = 18,
+			MinTextSize = 12,
+			MaxTextSize = 20,
+			TargetPosition = UDim2.fromScale(0.98, 0.08),
+			HiddenPosition = UDim2.fromScale(1.22, 0.08),
+		},
+		CoinPopup = {
+			Size = 54,
+			MinX = 0.18,
+			MaxX = 0.82,
+			StartY = 0.955,
+			StartJitter = 0.01,
+			PeakY = 0.82,
+			PeakJitter = 0.015,
+			MaxTextSize = 22,
+		},
+	},
+}
+
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local coinCollectedEffect = remotes:WaitForChild("CoinCollectedEffect")
@@ -46,6 +99,10 @@ local pendingPurchaseEffectButton
 local upgradeGuiReady = false
 local updateUpgradeBoard
 
+
+local function getUIProfile()
+	return ResponsiveUI.IsMobileLike() and UI_PROFILES.Mobile or UI_PROFILES.Desktop
+end
 
 local function getGameFont()
 	return (UIAssetConfig.Fonts and UIAssetConfig.Fonts.Main) or Enum.Font.Arcade
@@ -298,14 +355,11 @@ local function showCoinPickupPopup(amount)
 	cleanupLegacyCoinPickupEffects()
 
 	local popupLayer = getOrCreateGuiLayer("CoinPickupGui", 20)
-	local viewport = ResponsiveUI.GetViewportSize()
-	local isMobileLike = math.min(viewport.X, viewport.Y) <= 700
-	local popupSize = isMobileLike and 54 or 70
-	local minX = isMobileLike and 0.18 or 0.12
-	local maxX = isMobileLike and 0.82 or 0.88
-	local randomX = minX + (math.random() * (maxX - minX))
-	local startY = isMobileLike and (0.955 + (math.random() * 0.01)) or (0.98 + (math.random() * 0.005))
-	local peakY = isMobileLike and (0.82 + (math.random() * 0.015)) or (0.84 + (math.random() * 0.012))
+	local profile = getUIProfile().CoinPopup
+	local popupSize = profile.Size
+	local randomX = profile.MinX + (math.random() * (profile.MaxX - profile.MinX))
+	local startY = profile.StartY + (math.random() * profile.StartJitter)
+	local peakY = profile.PeakY + (math.random() * profile.PeakJitter)
 	local startRotation = math.random(-8, 8)
 	local fallRotation = startRotation + math.random(360, 540)
 
@@ -370,7 +424,7 @@ local function showCoinPickupPopup(amount)
 	applyAnimatedTextGradient(text)
 
 	local textSizeConstraint = Instance.new("UITextSizeConstraint")
-	textSizeConstraint.MaxTextSize = isMobileLike and 22 or 28
+	textSizeConstraint.MaxTextSize = profile.MaxTextSize
 	textSizeConstraint.MinTextSize = 10
 	textSizeConstraint.Parent = text
 
@@ -409,10 +463,14 @@ local function showNotification(notificationType, message)
 	local config = NOTIFICATION_CONFIG[notificationType] or NOTIFICATION_CONFIG.Error
 	local assetConfig = getNotificationAssetConfig(notificationType)
 	local notificationLayer = getOrCreateGuiLayer("NotificationsGui", 100)
-	local isMobileLike = ResponsiveUI.IsMobileLike()
+	local profile = getUIProfile().Notification
 	notificationCount += 1
 
-	local targetPosition = UDim2.fromScale(0.98, 0.08)
+	local targetPosition = profile.TargetPosition
+	local hiddenPosition = profile.HiddenPosition
+	local iconSize = profile.IconBoxSize - (profile.IconPadding * 2)
+	local labelX = profile.Padding + profile.IconBoxSize + profile.TextGap
+	local labelWidthPadding = labelX + profile.Padding
 	local frame = Instance.new("Frame")
 	frame.Name = `Notification{notificationCount}`
 	frame.AnchorPoint = Vector2.new(1, 0)
@@ -420,11 +478,10 @@ local function showNotification(notificationType, message)
 	frame.BackgroundTransparency = 0.05
 	frame.BorderSizePixel = 0
 	frame.ClipsDescendants = true
-	frame.Position = UDim2.fromScale(1.2, 0.08)
-	frame.Size = UDim2.fromOffset(isMobileLike and 240 or 300, isMobileLike and 52 or 66)
+	frame.Position = hiddenPosition
+	frame.Size = UDim2.fromOffset(profile.Width, profile.Height)
 	frame.ZIndex = 100 + (notificationCount * 10)
 	frame.Parent = notificationLayer
-	applyResponsiveScale(frame, isMobileLike and 0.92 or 1)
 
 	addStroke(frame, Color3.fromRGB(245, 245, 235), 2, 0.1)
 	addGradient(frame, config.Color, Color3.fromRGB(38, 40, 42), 0)
@@ -435,8 +492,8 @@ local function showNotification(notificationType, message)
 	iconBackground.BackgroundColor3 = Color3.fromRGB(18, 20, 18)
 	iconBackground.BackgroundTransparency = 0.05
 	iconBackground.BorderSizePixel = 0
-	iconBackground.Position = UDim2.fromOffset(9, 9)
-	iconBackground.Size = UDim2.fromOffset(42, 42)
+	iconBackground.Position = UDim2.fromOffset(profile.Padding, profile.Padding)
+	iconBackground.Size = UDim2.fromOffset(profile.IconBoxSize, profile.IconBoxSize)
 	iconBackground.ZIndex = frame.ZIndex + 4
 	iconBackground.Parent = frame
 	addStroke(iconBackground, Color3.fromRGB(255, 255, 245), 1.5, 0.25)
@@ -446,9 +503,9 @@ local function showNotification(notificationType, message)
 	icon.BackgroundTransparency = 1
 	icon.BorderSizePixel = 0
 	icon.Image = assetConfig.IconImage or "rbxassetid://0"
-	icon.Position = UDim2.fromOffset(7, 7)
+	icon.Position = UDim2.fromOffset(profile.IconPadding, profile.IconPadding)
 	icon.ScaleType = Enum.ScaleType.Fit
-	icon.Size = UDim2.fromOffset(28, 28)
+	icon.Size = UDim2.fromOffset(iconSize, iconSize)
 	icon.ZIndex = frame.ZIndex + 5
 	icon.Parent = iconBackground
 
@@ -457,17 +514,24 @@ local function showNotification(notificationType, message)
 	label.BackgroundTransparency = 1
 	label.BorderSizePixel = 0
 	label.Font = getGameFont()
-	label.Position = UDim2.fromOffset(60, 7)
-	label.Size = UDim2.new(1, -70, 1, -14)
+	label.Position = UDim2.fromOffset(labelX, profile.Padding)
+	label.Size = UDim2.new(1, -labelWidthPadding, 1, -(profile.Padding * 2))
 	label.Text = message
 	label.TextColor3 = Color3.fromRGB(248, 248, 238)
 	label.TextScaled = true
+	label.TextSize = profile.TextSize
 	label.TextStrokeTransparency = 0.55
 	label.TextWrapped = true
 	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.TextYAlignment = Enum.TextYAlignment.Center
 	label.ZIndex = frame.ZIndex + 5
 	label.Parent = frame
 	applyAnimatedTextGradient(label)
+
+	local textSizeConstraint = Instance.new("UITextSizeConstraint")
+	textSizeConstraint.MinTextSize = profile.MinTextSize
+	textSizeConstraint.MaxTextSize = profile.MaxTextSize
+	textSizeConstraint.Parent = label
 
 	TweenService:Create(frame, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 		Position = targetPosition,
@@ -479,7 +543,7 @@ local function showNotification(notificationType, message)
 		end
 
 		local outTween = TweenService:Create(frame, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-			Position = UDim2.fromScale(1.2, 0.08),
+			Position = hiddenPosition,
 			BackgroundTransparency = 1,
 		})
 
