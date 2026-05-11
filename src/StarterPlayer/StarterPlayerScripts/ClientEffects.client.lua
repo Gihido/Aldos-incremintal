@@ -421,6 +421,7 @@ local function showNotification(notificationType, message)
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.ZIndex = frame.ZIndex + 5
 	label.Parent = frame
+	addCorner(label, UDim.new(0, 6))
 
 	TweenService:Create(frame, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 		Position = targetPosition,
@@ -770,6 +771,62 @@ local function createTooltip(parent)
 	return tooltip
 end
 
+local function createTextBox(parent, name, position, size, color, backgroundImage, zIndex)
+	local box = Instance.new("Frame")
+	box.Name = name
+	box.BackgroundColor3 = color
+	box.BackgroundTransparency = hasCustomAssetId(backgroundImage) and 1 or 0.06
+	box.BorderSizePixel = 0
+	box.ClipsDescendants = true
+	box.Position = position
+	box.Size = size
+	box.ZIndex = zIndex
+	box.Parent = parent
+	addStroke(box, Color3.fromRGB(235, 235, 220), 2, 0.18)
+	addImageBackground(box, backgroundImage, 0.03, 0.95)
+
+	return box
+end
+
+local function createBoxLabel(parent, name, textValue, font, color)
+	local label = Instance.new("TextLabel")
+	label.Name = name
+	label.BackgroundTransparency = 1
+	label.BorderSizePixel = 0
+	label.Font = font or Enum.Font.GothamBold
+	label.Position = UDim2.fromOffset(8, 6)
+	label.Size = UDim2.new(1, -16, 1, -12)
+	label.Text = textValue
+	label.TextColor3 = color or Color3.fromRGB(248, 248, 236)
+	label.TextScaled = true
+	label.TextStrokeTransparency = 0.58
+	label.TextWrapped = true
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	label.TextYAlignment = Enum.TextYAlignment.Center
+	label.ZIndex = parent.ZIndex + 5
+	label.Parent = parent
+
+	return label
+end
+
+local function createTooltip(parent)
+	local tooltip = createTextBox(
+		parent,
+		"Tooltip",
+		UDim2.fromOffset(220, 445),
+		UDim2.fromOffset(130, 38),
+		Color3.fromRGB(48, 54, 48),
+		(UIAssetConfig.Tooltip or {}).BackgroundImage,
+		80
+	)
+	tooltip.Visible = false
+
+	local label = createBoxLabel(tooltip, "TooltipText", "+1", Enum.Font.GothamBold, Color3.fromRGB(255, 252, 220))
+	label.TextStrokeTransparency = 0.62
+
+	return tooltip
+end
+
 local function createUpgradeCard(parent, upgradeId, index)
 	local cardScale
 	local assetConfig = getUpgradeAssetConfig(upgradeId)
@@ -880,6 +937,7 @@ local function createUpgradeCard(parent, upgradeId, index)
 		Level = level,
 		Effect = effect,
 		Price = price,
+		BonusMini = bonusMini,
 		Tooltip = tooltip,
 		Buy = buyButton,
 		BuyMax = buyMaxButton,
@@ -955,6 +1013,10 @@ local function setupUpgradeBoard()
 		surfaceGui.Parent = boardPart
 	else
 		surfaceGui:ClearAllChildren()
+		surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+		surfaceGui.CanvasSize = Vector2.new(1600, 900)
+		surfaceGui.PixelsPerStud = 80
+		surfaceGui.LightInfluence = 0
 	end
 
 	surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
@@ -1077,7 +1139,11 @@ end
 
 
 coinCollectedEffect.OnClientEvent:Connect(function(amount)
+	print("[CoinCollectedEffect handler] ClientEffects")
+	cleanupLegacyCoinPickupEffects()
 	showCoinPickupPopup(amount)
+	task.defer(cleanupLegacyCoinPickupEffects)
+	task.delay(0.15, cleanupLegacyCoinPickupEffects)
 end)
 
 upgradeResultRemote.OnClientEvent:Connect(function(result)
