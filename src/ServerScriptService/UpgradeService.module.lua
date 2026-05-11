@@ -173,6 +173,10 @@ function UpgradeService.OnMaxCoinsChanged(callback)
 	table.insert(maxCoinsChangedCallbacks, callback)
 end
 
+function UpgradeService.NotifyMaxCoinsChanged()
+	notifyMaxCoinsChanged()
+end
+
 function UpgradeService.BuildPlayerPayload(player)
 	local data = DataService.Get(player)
 	local upgrades = {}

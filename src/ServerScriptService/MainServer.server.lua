@@ -6,6 +6,8 @@ local REMOTE_NAMES = {
 	"UpgradeResult",
 	"SyncPlayerData",
 	"CollectZoneState",
+	"AdminRequest",
+	"AdminResult",
 }
 
 local function getOrCreateRemotes()
@@ -69,6 +71,7 @@ local UpgradeService = safeRequire("UpgradeService")
 local LeaderboardService = safeRequire("LeaderboardService")
 local BillboardStatsService = safeRequire("BillboardStatsService")
 local CoinService = safeRequire("CoinService")
+local AdminService = safeRequire("AdminService")
 
 if DataService then
 	safeInit("DataService", function()
@@ -97,5 +100,11 @@ end
 if CoinService then
 	safeInit("CoinService", function()
 		CoinService.Init(remotes)
+	end)
+end
+
+if AdminService then
+	safeInit("AdminService", function()
+		AdminService.Init(remotes)
 	end)
 end

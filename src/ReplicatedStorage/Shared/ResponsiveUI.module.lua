@@ -17,11 +17,11 @@ function ResponsiveUI.GetScreenScale()
 	local minSide = math.min(size.X, size.Y)
 
 	if minSide <= 500 then
-		return 0.72
+		return 0.68
 	elseif minSide <= 700 then
-		return 0.82
+		return 0.78
 	elseif minSide <= 900 then
-		return 0.92
+		return 0.9
 	else
 		return 1
 	end

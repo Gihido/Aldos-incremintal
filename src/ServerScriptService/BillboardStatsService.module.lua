@@ -3,7 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local shared = ReplicatedStorage:WaitForChild("Shared")
-local FormatNumberModule = require(shared:WaitForChild("FormatNumber"))
+local FormatNumber = require(shared:WaitForChild("FormatNumber"))
 local UIAssetConfig = require(shared:WaitForChild("UIAssetConfig"))
 
 local BILLBOARD_NAME = "CoinsBillboard"
@@ -14,26 +14,8 @@ local BillboardStatsService = {}
 local hookedPlayers = {}
 local coinConnections = {}
 
-local function formatNumber(value)
-	value = tonumber(value) or 0
-
-	if type(FormatNumberModule) == "function" then
-		return FormatNumberModule(value)
-	end
-
-	if type(FormatNumberModule) == "table" and type(FormatNumberModule.Format) == "function" then
-		return FormatNumberModule.Format(value)
-	end
-
-	return tostring(math.floor(value))
-end
-
 local function getGameFont()
-	if UIAssetConfig.Fonts and typeof(UIAssetConfig.Fonts.Main) == "EnumItem" then
-		return UIAssetConfig.Fonts.Main
-	end
-
-	return Enum.Font.Arcade
+	return (UIAssetConfig.Fonts and UIAssetConfig.Fonts.Main) or Enum.Font.Arcade
 end
 
 local function getCoinsValue(player)
@@ -48,11 +30,6 @@ local function getBillboardAdornee(character)
 end
 
 local function applyCoinsGradient(textObject)
-	local oldGradient = textObject:FindFirstChild("CoinsBillboardGradient")
-	if oldGradient then
-		oldGradient:Destroy()
-	end
-
 	local gradient = Instance.new("UIGradient")
 	gradient.Name = "CoinsBillboardGradient"
 	gradient.Color = ColorSequence.new({
@@ -66,15 +43,9 @@ local function applyCoinsGradient(textObject)
 	task.spawn(function()
 		while gradient.Parent == textObject do
 			gradient.Offset = Vector2.new(-1, 0)
-
-			local tween = TweenService:Create(
-				gradient,
-				TweenInfo.new(2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-				{
-					Offset = Vector2.new(1, 0),
-				}
-			)
-
+			local tween = TweenService:Create(gradient, TweenInfo.new(2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+				Offset = Vector2.new(1, 0),
+			})
 			tween:Play()
 			tween.Completed:Wait()
 		end
@@ -86,8 +57,8 @@ local function updateBillboard(player)
 	local billboard = character and character:FindFirstChild(BILLBOARD_NAME, true)
 	local label = billboard and billboard:FindFirstChild(LABEL_NAME, true)
 
-	if label and label:IsA("TextLabel") then
-		label.Text = "Coins: " .. formatNumber(getCoinsValue(player))
+	if label then
+		label.Text = `Coins: {FormatNumber(getCoinsValue(player))}`
 	end
 end
 
@@ -113,10 +84,10 @@ local function createBillboard(player)
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = BILLBOARD_NAME
 	billboard.AlwaysOnTop = true
+	billboard.LightInfluence = 0
 	billboard.MaxDistance = 120
 	billboard.Size = UDim2.fromOffset(190, 38)
 	billboard.StudsOffset = Vector3.new(0, 2.45, 0)
-	billboard.Adornee = adornee
 	billboard.Parent = adornee
 
 	local label = Instance.new("TextLabel")
@@ -125,19 +96,18 @@ local function createBillboard(player)
 	label.BorderSizePixel = 0
 	label.Font = getGameFont()
 	label.Size = UDim2.fromScale(1, 1)
-	label.Text = "Coins: " .. formatNumber(getCoinsValue(player))
+	label.Text = `Coins: {FormatNumber(getCoinsValue(player))}`
 	label.TextColor3 = Color3.fromRGB(255, 235, 90)
 	label.TextScaled = true
 	label.TextStrokeColor3 = Color3.fromRGB(35, 20, 0)
 	label.TextStrokeTransparency = 0.25
-	label.TextXAlignment = Enum.TextXAlignment.Center
-	label.TextYAlignment = Enum.TextYAlignment.Center
-	label.Parent = billboard
 
 	local textSizeConstraint = Instance.new("UITextSizeConstraint")
 	textSizeConstraint.MinTextSize = 10
 	textSizeConstraint.MaxTextSize = 20
 	textSizeConstraint.Parent = label
+
+	label.Parent = billboard
 
 	applyCoinsGradient(label)
 end
@@ -167,7 +137,6 @@ local function setupPlayer(player)
 
 	player.CharacterAdded:Connect(function()
 		task.defer(function()
-			task.wait(0.3)
 			createBillboard(player)
 			hookCoinsChanged(player)
 			updateBillboard(player)
@@ -184,9 +153,7 @@ local function setupPlayer(player)
 	end)
 
 	if player.Character then
-		task.defer(function()
-			createBillboard(player)
-		end)
+		createBillboard(player)
 	end
 
 	hookCoinsChanged(player)
@@ -195,7 +162,6 @@ end
 
 function BillboardStatsService.Init()
 	Players.PlayerAdded:Connect(setupPlayer)
-
 	Players.PlayerRemoving:Connect(function(player)
 		hookedPlayers[player] = nil
 

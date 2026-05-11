@@ -7,7 +7,7 @@ local DataService = require(script.Parent.DataService)
 local shared = ReplicatedStorage:WaitForChild("Shared")
 local FormatNumber = require(shared:WaitForChild("FormatNumber"))
 local UIAssetConfig = require(shared:WaitForChild("UIAssetConfig"))
-local BOARD_UPDATE_SECONDS = 2.5
+local BOARD_UPDATE_SECONDS = 1.5
 
 local function hasCustomAssetId(assetId)
 	return type(assetId) == "string" and assetId ~= "" and assetId ~= "rbxassetid://0"
@@ -52,7 +52,8 @@ local LeaderboardService = {}
 
 local rowLabels = {}
 local updateLoopStarted = false
-local getCoins
+local coinChangedConnections = {}
+local renderBoard
 
 local function createCorner(parent, radius)
 	local corner = Instance.new("UICorner")
@@ -184,22 +185,14 @@ local function createLeaderstats(player)
 
 	coins.Value = data.Coins
 
-	if not player:GetAttribute("CoinsBillboardHooked") then
-		player:SetAttribute("CoinsBillboardHooked", true)
-		player.CharacterAdded:Connect(function()
-			task.defer(function()
-				setupCoinsBillboard(player)
-				updateCoinsBillboardText(player)
-			end)
-		end)
-
-		coins:GetPropertyChangedSignal("Value"):Connect(function()
-			updateCoinsBillboardText(player)
-		end)
+	if coinChangedConnections[player] then
+		coinChangedConnections[player]:Disconnect()
+		coinChangedConnections[player] = nil
 	end
 
-	setupCoinsBillboard(player)
-	updateCoinsBillboardText(player)
+	coinChangedConnections[player] = coins:GetPropertyChangedSignal("Value"):Connect(function()
+		renderBoard()
+	end)
 end
 
 function getCoins(player)
@@ -440,7 +433,7 @@ local function animateRow(row)
 	}):Play()
 end
 
-local function renderBoard()
+renderBoard = function()
 	if #rowLabels == 0 then
 		return
 	end
@@ -482,6 +475,10 @@ local function startUpdateLoop()
 	end)
 end
 
+function LeaderboardService.Refresh()
+	renderBoard()
+end
+
 function LeaderboardService.SetCoins(player, amount)
 	local leaderstats = player:FindFirstChild("leaderstats")
 	local coins = leaderstats and leaderstats:FindFirstChild("Coins")
@@ -490,7 +487,7 @@ function LeaderboardService.SetCoins(player, amount)
 		coins.Value = amount
 	end
 
-	renderBoard()
+	LeaderboardService.Refresh()
 end
 
 function LeaderboardService.Init()
@@ -499,14 +496,23 @@ function LeaderboardService.Init()
 
 	Players.PlayerAdded:Connect(function(player)
 		createLeaderstats(player)
-		renderBoard()
+		LeaderboardService.Refresh()
+	end)
+
+	Players.PlayerRemoving:Connect(function(player)
+		if coinChangedConnections[player] then
+			coinChangedConnections[player]:Disconnect()
+			coinChangedConnections[player] = nil
+		end
+
+		task.defer(LeaderboardService.Refresh)
 	end)
 
 	for _, player in ipairs(Players:GetPlayers()) do
 		createLeaderstats(player)
 	end
 
-	renderBoard()
+	LeaderboardService.Refresh()
 end
 
 return LeaderboardService

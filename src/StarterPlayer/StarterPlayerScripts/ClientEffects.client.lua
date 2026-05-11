@@ -300,12 +300,12 @@ local function showCoinPickupPopup(amount)
 	local popupLayer = getOrCreateGuiLayer("CoinPickupGui", 20)
 	local viewport = ResponsiveUI.GetViewportSize()
 	local isMobileLike = math.min(viewport.X, viewport.Y) <= 700
-	local popupSize = isMobileLike and 62 or 78
-	local minX = isMobileLike and 0.16 or 0.1
-	local maxX = isMobileLike and 0.84 or 0.9
+	local popupSize = isMobileLike and 54 or 70
+	local minX = isMobileLike and 0.18 or 0.12
+	local maxX = isMobileLike and 0.82 or 0.88
 	local randomX = minX + (math.random() * (maxX - minX))
-	local startY = isMobileLike and (0.96 + (math.random() * 0.015)) or (0.98 + (math.random() * 0.01))
-	local peakY = isMobileLike and (0.80 + (math.random() * 0.025)) or (0.83 + (math.random() * 0.02))
+	local startY = isMobileLike and (0.955 + (math.random() * 0.01)) or (0.98 + (math.random() * 0.005))
+	local peakY = isMobileLike and (0.82 + (math.random() * 0.015)) or (0.84 + (math.random() * 0.012))
 	local startRotation = math.random(-8, 8)
 	local fallRotation = startRotation + math.random(360, 540)
 
@@ -421,10 +421,10 @@ local function showNotification(notificationType, message)
 	frame.BorderSizePixel = 0
 	frame.ClipsDescendants = true
 	frame.Position = UDim2.fromScale(1.2, 0.08)
-	frame.Size = UDim2.fromOffset(isMobileLike and 280 or 300, isMobileLike and 60 or 66)
+	frame.Size = UDim2.fromOffset(isMobileLike and 240 or 300, isMobileLike and 52 or 66)
 	frame.ZIndex = 100 + (notificationCount * 10)
 	frame.Parent = notificationLayer
-	applyResponsiveScale(frame, 1)
+	applyResponsiveScale(frame, isMobileLike and 0.92 or 1)
 
 	addStroke(frame, Color3.fromRGB(245, 245, 235), 2, 0.1)
 	addGradient(frame, config.Color, Color3.fromRGB(38, 40, 42), 0)

@@ -139,9 +139,33 @@ function DataService.RestorePosition(player)
 	rootPart.CFrame = CFrame.new(position.X, position.Y, position.Z)
 end
 
+local function updateLeaderstatsCoins(player)
+	local data = DataService.Get(player)
+	local leaderstats = player:FindFirstChild("leaderstats")
+	local coins = leaderstats and leaderstats:FindFirstChild("Coins")
+
+	if coins then
+		coins.Value = data.Coins
+	end
+end
+
+function DataService.GetPlayerData(player)
+	return DataService.Get(player)
+end
+
+function DataService.SetCoins(player, value)
+	local data = DataService.Get(player)
+	data.Coins = math.max(0, sanitizeNumber(value, 0))
+	updateLeaderstatsCoins(player)
+
+	return data.Coins
+end
+
 function DataService.AddCoins(player, amount)
 	local data = DataService.Get(player)
-	data.Coins = math.max(0, data.Coins + amount)
+	local safeAmount = sanitizeNumber(amount, 0)
+	data.Coins = math.max(0, data.Coins + safeAmount)
+	updateLeaderstatsCoins(player)
 
 	return data.Coins
 end
@@ -165,6 +189,17 @@ end
 function DataService.GetUpgradeLevel(player, upgradeId)
 	local data = DataService.Get(player)
 	return data.Upgrades[upgradeId] or 0
+end
+
+function DataService.ResetProgress(player)
+	local currentData = DataService.Get(player)
+	local currentPosition = type(currentData.Position) == "table" and deepCopy(currentData.Position) or deepCopy(DEFAULT_DATA.Position)
+	local resetData = deepCopy(DEFAULT_DATA)
+	resetData.Position = currentPosition
+	sessionData[player] = resetData
+	updateLeaderstatsCoins(player)
+
+	return resetData
 end
 
 function DataService.Save(player, keepSession)
@@ -191,6 +226,10 @@ function DataService.Save(player, keepSession)
 	end
 
 	return true
+end
+
+function DataService.SavePlayer(player)
+	return DataService.Save(player, true)
 end
 
 function DataService.Init()
