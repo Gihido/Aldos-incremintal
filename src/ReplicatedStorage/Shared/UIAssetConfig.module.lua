@@ -111,6 +111,7 @@ local UIAssetConfig = {
 			ItemSlotBackground = "rbxassetid://0",
 			ItemInfoBackground = "rbxassetid://0",
 			TooltipBackground = "rbxassetid://0",
+			BuffTooltipBackground = "rbxassetid://0",
 
 			ActivateButtonBackground = "rbxassetid://0",
 			DeleteButtonBackground = "rbxassetid://0",
@@ -125,6 +126,7 @@ local UIAssetConfig = {
 				SlotBackground = "rbxassetid://0",
 				InfoBackground = "rbxassetid://0",
 				TooltipBackground = "rbxassetid://0",
+				BuffTooltipBackground = "rbxassetid://0",
 				BuffIcon = "rbxassetid://0",
 			},
 
@@ -133,6 +135,7 @@ local UIAssetConfig = {
 				SlotBackground = "rbxassetid://0",
 				InfoBackground = "rbxassetid://0",
 				TooltipBackground = "rbxassetid://0",
+				BuffTooltipBackground = "rbxassetid://0",
 				BuffIcon = "rbxassetid://0",
 			},
 
@@ -141,6 +144,7 @@ local UIAssetConfig = {
 				SlotBackground = "rbxassetid://0",
 				InfoBackground = "rbxassetid://0",
 				TooltipBackground = "rbxassetid://0",
+				BuffTooltipBackground = "rbxassetid://0",
 				BuffIcon = "rbxassetid://0",
 			},
 
@@ -149,6 +153,7 @@ local UIAssetConfig = {
 				SlotBackground = "rbxassetid://0",
 				InfoBackground = "rbxassetid://0",
 				TooltipBackground = "rbxassetid://0",
+				BuffTooltipBackground = "rbxassetid://0",
 				BuffIcon = "rbxassetid://0",
 			},
 		},

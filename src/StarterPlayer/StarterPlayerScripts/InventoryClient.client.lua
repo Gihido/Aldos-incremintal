@@ -250,6 +250,11 @@ local function getTooltipBackground(itemId)
 	return itemAssets.TooltipBackground or getMainAssets().TooltipBackground
 end
 
+local function getBuffTooltipBackground(itemId)
+	local itemAssets = getItemAssets(itemId)
+	return itemAssets.BuffTooltipBackground or getMainAssets().BuffTooltipBackground or getTooltipBackground(itemId)
+end
+
 local function getInfoBackground(itemId)
 	local itemAssets = getItemAssets(itemId)
 	return itemAssets.InfoBackground or getMainAssets().ItemInfoBackground
@@ -338,23 +343,60 @@ local function applyInventoryAssets()
 end
 
 local function updateResponsiveScale()
-	local isMobile = ResponsiveUI.IsMobileLike()
-
 	if ui.InventoryScale then
-		ui.InventoryScale.Scale = isMobile and 0.74 or 1
+		ui.InventoryScale.Scale = ResponsiveUI.GetMobileScale("Inventory")
 	end
 
 	if ui.TooltipScale then
-		ui.TooltipScale.Scale = isMobile and 0.8 or 1
+		ui.TooltipScale.Scale = ResponsiveUI.GetMobileScale("Tooltip")
 	end
 
 	if ui.BuffsScale then
-		ui.BuffsScale.Scale = isMobile and 0.78 or 1
+		ui.BuffsScale.Scale = ResponsiveUI.GetMobileScale("BuffsPanel")
 	end
 
 	if ui.ButtonScale then
-		ui.ButtonScale.Scale = isMobile and 0.85 or 1
+		ui.ButtonScale.Scale = ResponsiveUI.GetMobileScale("ToggleButton")
 	end
+end
+
+local function ensureCloseInfoButtonVisible()
+	if not ui.CloseInfoButton or not ui.CloseInfoButton:IsA("GuiObject") then
+		return
+	end
+
+	ui.CloseInfoButton.Visible = true
+	ui.CloseInfoButton.ZIndex = math.max(ui.CloseInfoButton.ZIndex, (ui.ItemInfoPanel and ui.ItemInfoPanel.ZIndex or 0) + 30)
+	ui.CloseInfoButton.BackgroundTransparency = 1
+
+	if ui.CloseInfoButton:IsA("ImageButton") or ui.CloseInfoButton:IsA("ImageLabel") then
+		ui.CloseInfoButton.ImageTransparency = 0
+	end
+
+	if ui.CloseInfoButton.AbsoluteSize.X < 38 or ui.CloseInfoButton.AbsoluteSize.Y < 38 then
+		ui.CloseInfoButton.Size = UDim2.fromOffset(math.max(38, ui.CloseInfoButton.AbsoluteSize.X), math.max(38, ui.CloseInfoButton.AbsoluteSize.Y))
+	end
+
+	local fallbackLabel = ui.CloseInfoButton:FindFirstChild("FallbackX")
+	if not fallbackLabel then
+		fallbackLabel = Instance.new("TextLabel")
+		fallbackLabel.Name = "FallbackX"
+		fallbackLabel.BackgroundTransparency = 1
+		fallbackLabel.Size = UDim2.fromScale(1, 1)
+		fallbackLabel.Font = getGameFont()
+		fallbackLabel.Text = "X"
+		fallbackLabel.TextColor3 = Color3.fromRGB(255, 245, 245)
+		fallbackLabel.TextScaled = true
+		fallbackLabel.TextStrokeColor3 = Color3.fromRGB(130, 20, 20)
+		fallbackLabel.TextStrokeTransparency = 0.15
+		fallbackLabel.ZIndex = ui.CloseInfoButton.ZIndex + 1
+		fallbackLabel.Parent = ui.CloseInfoButton
+	end
+
+	fallbackLabel.Visible = true
+	fallbackLabel.ZIndex = ui.CloseInfoButton.ZIndex + 1
+	applyTextConstraint(fallbackLabel, 18, 34)
+	ensureStroke(ui.CloseInfoButton, "CloseButtonFallbackStroke", Color3.fromRGB(255, 235, 235), 2, 0.15).Enabled = true
 end
 
 local getInfoHiddenPosition
@@ -576,6 +618,41 @@ local function openItemInfo(itemId)
 	updateAllSlots()
 end
 
+local function formatTooltipRemaining(seconds)
+	seconds = math.max(0, math.floor(seconds or 0))
+
+	if seconds >= 60 then
+		local minutes = math.floor(seconds / 60)
+		local remainder = seconds % 60
+
+		if remainder > 0 then
+			return `{minutes}m {remainder}s`
+		end
+
+		return `{minutes}m`
+	end
+
+	return `{seconds}s`
+end
+
+local function getClampedTooltipPosition(position)
+	if not ui.ItemTooltip then
+		return position or UDim2.fromOffset(0, 0)
+	end
+
+	local viewport = ResponsiveUI.GetViewportSize()
+	local requestedX = position and position.X.Offset or 0
+	local requestedY = position and position.Y.Offset or 0
+	local width = ui.ItemTooltip.AbsoluteSize.X * (ui.TooltipScale and ui.TooltipScale.Scale or 1)
+	local height = ui.ItemTooltip.AbsoluteSize.Y * (ui.TooltipScale and ui.TooltipScale.Scale or 1)
+	local padding = 12
+
+	return UDim2.fromOffset(
+		math.clamp(requestedX, padding, math.max(padding, viewport.X - width - padding)),
+		math.clamp(requestedY, padding, math.max(padding, viewport.Y - height - padding))
+	)
+end
+
 local function showTooltip(itemId, position)
 	if not ui.ItemTooltip or not ItemConfig[itemId] then
 		return
@@ -585,7 +662,21 @@ local function showTooltip(itemId, position)
 	setImageOrFallback(ui.TooltipBackground, getTooltipBackground(itemId), Color3.fromRGB(24, 32, 42))
 	setText(ui.TooltipName, definition.DisplayName)
 	setText(ui.TooltipBoost, `{definition.BoostText} / {definition.Duration}s`)
-	ui.ItemTooltip.Position = position or UDim2.fromOffset(0, 0)
+	ui.ItemTooltip.Position = getClampedTooltipPosition(position or UDim2.fromOffset(0, 0))
+	ui.ItemTooltip.Visible = true
+end
+
+local function showBuffTooltip(buff, position)
+	if not ui.ItemTooltip or type(buff) ~= "table" or not ItemConfig[buff.ItemId] then
+		return
+	end
+
+	local definition = ItemConfig[buff.ItemId]
+	local remaining = (buff.EndTime or os.time()) - os.time()
+	setImageOrFallback(ui.TooltipBackground, getBuffTooltipBackground(buff.ItemId), Color3.fromRGB(24, 32, 42))
+	setText(ui.TooltipName, definition.DisplayName)
+	setText(ui.TooltipBoost, `{definition.BoostText}\nОсталось: {formatTooltipRemaining(remaining)}`)
+	ui.ItemTooltip.Position = getClampedTooltipPosition(position or UDim2.fromOffset(0, 0))
 	ui.ItemTooltip.Visible = true
 end
 
@@ -736,6 +827,7 @@ local function updateActiveBuffs(data)
 			local row = ui.BuffTemplate:Clone()
 			row.Name = `Buff_{buff.Uid}`
 			row:SetAttribute("EndTime", buff.EndTime)
+			row.Active = true
 			row.Visible = true
 			row.Parent = ui.BuffsScroll
 
@@ -746,6 +838,12 @@ local function updateActiveBuffs(data)
 			setImageOrFallback(background, getMainAssets().BuffSlotBackground, Color3.fromRGB(28, 36, 48))
 			setImageOrFallback(icon, getItemIcon(buff.ItemId, true), Color3.fromRGB(40, 48, 56))
 			setIconFallbackLetter(icon, buff.ItemId)
+
+			if icon and icon:IsA("GuiObject") then
+				icon.AnchorPoint = Vector2.new(0.5, 0.5)
+				icon.Position = UDim2.fromScale(0.5, 0.44)
+				icon.Size = UDim2.fromScale(0.72, 0.72)
+			end
 
 			if timeLabel and timeLabel:IsA("TextLabel") then
 				timeLabel.Text = formatRemaining(buff.Remaining or ((buff.EndTime or os.time()) - os.time()))
@@ -766,6 +864,22 @@ local function updateActiveBuffs(data)
 			multiplierLabel.Text = `x{string.format("%.2f", buff.CoinMultiplier or definition.CoinMultiplier or 1)}`
 			multiplierLabel.TextColor3 = Color3.fromRGB(255, 245, 170)
 			applyTextConstraint(multiplierLabel, 12, 24)
+
+			row.MouseEnter:Connect(function()
+				local mousePosition = UserInputService:GetMouseLocation()
+				showBuffTooltip(buff, UDim2.fromOffset(mousePosition.X + 14, mousePosition.Y + 12))
+			end)
+			row.MouseLeave:Connect(hideTooltip)
+			row.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+					showBuffTooltip(buff, UDim2.fromOffset(input.Position.X + 12, input.Position.Y + 12))
+				end
+			end)
+			row.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+					hideTooltip()
+				end
+			end)
 
 			buffRows[buff.Uid] = row
 		end
@@ -942,6 +1056,7 @@ task.wait()
 captureBaseLayout()
 applyInventoryTextStyles(gui)
 applyInventoryAssets()
+ensureCloseInfoButtonVisible()
 updateResponsiveScale()
 hookButtons()
 hookItemSlots()

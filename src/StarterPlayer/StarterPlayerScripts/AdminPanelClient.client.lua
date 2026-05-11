@@ -17,7 +17,7 @@ local UI_PROFILES = {
 	},
 	Mobile = {
 		PanelSize = Vector2.new(310, 500),
-		PanelScale = 0.75,
+		PanelScale = nil,
 		Position = UDim2.fromScale(0.98, 0.58),
 		OpenButtonSize = UDim2.fromOffset(70, 32),
 	},
@@ -148,7 +148,7 @@ local function updateScale()
 	end
 
 	if scaleObject then
-		scaleObject.Scale = getUIProfile().PanelScale
+		scaleObject.Scale = ResponsiveUI.IsMobileViewport() and ResponsiveUI.GetMobileScale("AdminPanel") or getUIProfile().PanelScale
 	end
 
 	if openButton then
@@ -232,7 +232,8 @@ local function createAdminPanel()
 	addGradient(panel, PANEL_COLOR_TOP, PANEL_COLOR_BOTTOM)
 
 	scaleObject = Instance.new("UIScale")
-	scaleObject.Scale = getUIProfile().PanelScale
+	scaleObject.Name = "AdminScale"
+	scaleObject.Scale = ResponsiveUI.IsMobileViewport() and ResponsiveUI.GetMobileScale("AdminPanel") or getUIProfile().PanelScale
 	scaleObject.Parent = panel
 
 	createTextLabel(panel, "Title", "Admin Panel", UDim2.fromOffset(14, 10), UDim2.new(1, -56, 0, 36), 24)

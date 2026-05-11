@@ -34,10 +34,13 @@ local function buildBuffsPayload(player)
 	local now = os.time()
 	local payload = {}
 
+	local seenItemIds = {}
+
 	for _, buff in ipairs(DataService.GetActiveBuffs(player)) do
 		local itemDefinition = getItemDefinition(buff.ItemId)
 
-		if itemDefinition then
+		if itemDefinition and not seenItemIds[buff.ItemId] then
+			seenItemIds[buff.ItemId] = true
 			table.insert(payload, {
 				Uid = buff.Uid,
 				ItemId = buff.ItemId,
@@ -85,10 +88,14 @@ function ItemService.GetCoinBuffMultiplier(player)
 	DataService.RemoveExpiredBuffs(player)
 
 	local multiplier = 1
+	local seenItemIds = {}
 
 	for _, buff in ipairs(DataService.GetActiveBuffs(player)) do
-		local value = tonumber(buff.CoinMultiplier) or 1
-		multiplier *= math.max(1, value)
+		if not seenItemIds[buff.ItemId] then
+			seenItemIds[buff.ItemId] = true
+			local value = tonumber(buff.CoinMultiplier) or 1
+			multiplier *= math.max(1, value)
+		end
 	end
 
 	return math.max(1, multiplier)
@@ -108,14 +115,43 @@ function ItemService.ActivateItem(player, itemId)
 	end
 
 	DataService.RemoveItem(player, itemId, 1)
-	DataService.AddActiveBuff(player, {
-		Uid = HttpService:GenerateGUID(false),
-		ItemId = itemId,
-		EndTime = os.time() + itemDefinition.Duration,
-		CoinMultiplier = itemDefinition.CoinMultiplier,
-	})
+	DataService.RemoveExpiredBuffs(player)
 
-	ItemService.SyncPlayer(player, "Success", `{itemDefinition.DisplayName} activated`)
+	local now = os.time()
+	local activeBuffs = DataService.GetActiveBuffs(player)
+	local existingBuff
+	local compactedBuffs = {}
+	local seenItemIds = {}
+
+	for _, buff in ipairs(activeBuffs) do
+		if type(buff) == "table" and getItemDefinition(buff.ItemId) and not seenItemIds[buff.ItemId] then
+			seenItemIds[buff.ItemId] = true
+			table.insert(compactedBuffs, buff)
+
+			if buff.ItemId == itemId then
+				existingBuff = buff
+			end
+		end
+	end
+
+	table.clear(activeBuffs)
+	for _, buff in ipairs(compactedBuffs) do
+		table.insert(activeBuffs, buff)
+	end
+
+	if existingBuff then
+		existingBuff.EndTime = math.max(tonumber(existingBuff.EndTime) or now, now) + itemDefinition.Duration
+		existingBuff.CoinMultiplier = itemDefinition.CoinMultiplier
+	else
+		DataService.AddActiveBuff(player, {
+			Uid = HttpService:GenerateGUID(false),
+			ItemId = itemId,
+			EndTime = now + itemDefinition.Duration,
+			CoinMultiplier = itemDefinition.CoinMultiplier,
+		})
+	end
+
+	ItemService.SyncPlayer(player, "Success", existingBuff and `{itemDefinition.DisplayName} extended` or `{itemDefinition.DisplayName} activated`)
 
 	if type(DataService.SavePlayer) == "function" then
 		task.defer(function()
