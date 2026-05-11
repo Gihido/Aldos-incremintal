@@ -394,6 +394,7 @@ local function showNotification(notificationType, message)
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.ZIndex = frame.ZIndex + 5
 	label.Parent = frame
+	addCorner(label, UDim.new(0, 6))
 
 	TweenService:Create(frame, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 		Position = targetPosition,
@@ -900,6 +901,10 @@ local function setupUpgradeBoard()
 		surfaceGui.Parent = boardPart
 	else
 		surfaceGui:ClearAllChildren()
+		surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+		surfaceGui.CanvasSize = Vector2.new(1600, 900)
+		surfaceGui.PixelsPerStud = 80
+		surfaceGui.LightInfluence = 0
 	end
 
 	surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
