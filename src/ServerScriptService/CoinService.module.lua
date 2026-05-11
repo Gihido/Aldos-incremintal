@@ -6,8 +6,9 @@ local ServerStorage = game:GetService("ServerStorage")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
-local DataService = require(script.Parent:WaitForChild("DataService"))
-local UpgradeService = require(script.Parent:WaitForChild("UpgradeService"))
+local DataService = require(script.Parent.DataService)
+local ItemService = require(script.Parent.ItemService)
+local UpgradeService = require(script.Parent.UpgradeService)
 
 local RESPAWN_SECONDS = 1
 local FILL_CHECK_SECONDS = 1
@@ -340,12 +341,21 @@ local function getServerMaxActiveCoins()
 end
 
 local function getCoinsPerPickup(player)
+	local baseAmount = 1
+
 	if type(UpgradeService.GetCoinsPerPickup) ~= "function" then
 		warn("UpgradeService.GetCoinsPerPickup is not available; using fallback pickup amount")
-		return 1
+	else
+		baseAmount = UpgradeService.GetCoinsPerPickup(player)
 	end
 
-	return UpgradeService.GetCoinsPerPickup(player)
+	local buffMultiplier = 1
+
+	if type(ItemService.GetCoinBuffMultiplier) == "function" then
+		buffMultiplier = ItemService.GetCoinBuffMultiplier(player)
+	end
+
+	return math.max(1, math.floor((tonumber(baseAmount) or 1) * (tonumber(buffMultiplier) or 1)))
 end
 
 local function awardCoinsToPlayer(player, amount)

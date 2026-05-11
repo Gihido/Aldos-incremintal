@@ -98,6 +98,62 @@ local UIAssetConfig = {
 	CollectZone = {
 		BackgroundImage = "rbxassetid://0",
 	},
+
+	Inventory = {
+		Main = {
+			ToggleButton = "rbxassetid://0",
+			Background = "rbxassetid://0",
+			CloseButton = "rbxassetid://0",
+
+			ItemsTabButton = "rbxassetid://0",
+			PassivesTabButton = "rbxassetid://0",
+
+			ItemSlotBackground = "rbxassetid://0",
+			ItemInfoBackground = "rbxassetid://0",
+			TooltipBackground = "rbxassetid://0",
+
+			ActivateButtonBackground = "rbxassetid://0",
+			DeleteButtonBackground = "rbxassetid://0",
+
+			ActiveBuffsBackground = "rbxassetid://0",
+			BuffSlotBackground = "rbxassetid://0",
+		},
+
+		Items = {
+			Carrot = {
+				Icon = "rbxassetid://0",
+				SlotBackground = "rbxassetid://0",
+				InfoBackground = "rbxassetid://0",
+				TooltipBackground = "rbxassetid://0",
+				BuffIcon = "rbxassetid://0",
+			},
+
+			Cucumber = {
+				Icon = "rbxassetid://0",
+				SlotBackground = "rbxassetid://0",
+				InfoBackground = "rbxassetid://0",
+				TooltipBackground = "rbxassetid://0",
+				BuffIcon = "rbxassetid://0",
+			},
+
+			Tomato = {
+				Icon = "rbxassetid://0",
+				SlotBackground = "rbxassetid://0",
+				InfoBackground = "rbxassetid://0",
+				TooltipBackground = "rbxassetid://0",
+				BuffIcon = "rbxassetid://0",
+			},
+
+			Corn = {
+				Icon = "rbxassetid://0",
+				SlotBackground = "rbxassetid://0",
+				InfoBackground = "rbxassetid://0",
+				TooltipBackground = "rbxassetid://0",
+				BuffIcon = "rbxassetid://0",
+			},
+		},
+	},
+
 }
 
 return UIAssetConfig

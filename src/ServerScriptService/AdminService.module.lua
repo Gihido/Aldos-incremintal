@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 
 local DataService = require(script.Parent.DataService)
+local ItemService = require(script.Parent.ItemService)
 local UpgradeService = require(script.Parent.UpgradeService)
 local LeaderboardService = require(script.Parent.LeaderboardService)
 
@@ -68,6 +69,10 @@ local function refreshPlayerSystems(player, refreshAllPlayers)
 
 	if type(LeaderboardService.Refresh) == "function" then
 		LeaderboardService.Refresh()
+	end
+
+	if type(ItemService.SyncPlayer) == "function" then
+		ItemService.SyncPlayer(player)
 	end
 end
 

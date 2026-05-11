@@ -8,6 +8,8 @@ local REMOTE_NAMES = {
 	"CollectZoneState",
 	"AdminRequest",
 	"AdminResult",
+	"InventoryAction",
+	"SyncInventory",
 }
 
 local function getOrCreateRemotes()
@@ -70,6 +72,7 @@ local DataService = safeRequire("DataService")
 local UpgradeService = safeRequire("UpgradeService")
 local LeaderboardService = safeRequire("LeaderboardService")
 local BillboardStatsService = safeRequire("BillboardStatsService")
+local ItemService = safeRequire("ItemService")
 local CoinService = safeRequire("CoinService")
 local AdminService = safeRequire("AdminService")
 
@@ -94,6 +97,12 @@ end
 if BillboardStatsService then
 	safeInit("BillboardStatsService", function()
 		BillboardStatsService.Init()
+	end)
+end
+
+if ItemService then
+	safeInit("ItemService", function()
+		ItemService.Init(remotes)
 	end)
 end
 
