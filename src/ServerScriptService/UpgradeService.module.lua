@@ -141,7 +141,7 @@ local function updateLeaderstats(player)
 end
 
 local function notifyMaxCoinsChanged()
-	for _, callback in maxCoinsChangedCallbacks do
+	for _, callback in ipairs(maxCoinsChangedCallbacks) do
 		task.spawn(callback)
 	end
 end
@@ -161,7 +161,7 @@ end
 function UpgradeService.GetServerMaxActiveCoins()
 	local maxCoins = BASE_MAX_ACTIVE_COINS
 
-	for _, player in Players:GetPlayers() do
+	for _, player in ipairs(Players:GetPlayers()) do
 		local level = getLevel(player, "MaxSpawnCoins")
 		maxCoins = math.max(maxCoins, getMaxSpawnCoins(level))
 	end
@@ -177,7 +177,7 @@ function UpgradeService.BuildPlayerPayload(player)
 	local data = DataService.Get(player)
 	local upgrades = {}
 
-	for upgradeId, definition in UPGRADE_DEFINITIONS do
+	for upgradeId, definition in pairs(UPGRADE_DEFINITIONS) do
 		local level = getLevel(player, upgradeId)
 		local isMaxed = level >= definition.MaxLevel
 		local buyMaxLevels, buyMaxCost = calculateBuyMax(player, upgradeId)
@@ -217,7 +217,7 @@ function UpgradeService.SyncPlayer(player)
 end
 
 function UpgradeService.SyncAllPlayers()
-	for _, player in Players:GetPlayers() do
+	for _, player in ipairs(Players:GetPlayers()) do
 		UpgradeService.SyncPlayer(player)
 	end
 end

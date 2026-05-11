@@ -157,6 +157,39 @@ local function getActiveCoinCount()
 	return activeCount
 end
 
+local function getServerMaxActiveCoins()
+	if type(UpgradeService.GetServerMaxActiveCoins) ~= "function" then
+		warn("UpgradeService.GetServerMaxActiveCoins is not available; using fallback max coins")
+		return 0
+	end
+
+	return UpgradeService.GetServerMaxActiveCoins()
+end
+
+local function getCoinsPerPickup(player)
+	if type(UpgradeService.GetCoinsPerPickup) ~= "function" then
+		warn("UpgradeService.GetCoinsPerPickup is not available; using fallback pickup amount")
+		return 1
+	end
+
+	return UpgradeService.GetCoinsPerPickup(player)
+end
+
+local function awardCoins(player, amount)
+	if type(DataService.AddCoins) ~= "function" then
+		warn("DataService.AddCoins is not available; coin award skipped")
+		return nil
+	end
+
+	return DataService.AddCoins(player, amount)
+end
+
+local function syncPlayer(player)
+	if type(UpgradeService.SyncPlayer) == "function" then
+		UpgradeService.SyncPlayer(player)
+	end
+end
+
 local function getPlayerRoot(player)
 	local character = player.Character
 
@@ -238,16 +271,16 @@ local function finishCoinCollection(player, coin, amount)
 		return
 	end
 
-	local newCoinBalance = DataService.AddCoins(player, amount)
+	local newCoinBalance = awardCoins(player, amount)
 	local leaderstats = player:FindFirstChild("leaderstats")
 	local coins = leaderstats and leaderstats:FindFirstChild("Coins")
 
-	if coins then
+	if coins and newCoinBalance then
 		coins.Value = newCoinBalance
 	end
 
 	coinCollectedEffect:FireClient(player, amount)
-	UpgradeService.SyncPlayer(player)
+	syncPlayer(player)
 
 	removeActiveCoin(coin)
 	coin:Destroy()
@@ -276,7 +309,7 @@ local function collectCoin(player, coin)
 		part.CanQuery = false
 	end
 
-	local amount = UpgradeService.GetCoinsPerPickup(player)
+	local amount = getCoinsPerPickup(player)
 	local startCFrame = getCoinCFrame(coin)
 	local awayDirection = startCFrame.Position - root.Position
 
@@ -291,7 +324,7 @@ local function collectCoin(player, coin)
 	end
 
 	local popPosition = startCFrame.Position + awayDirection.Unit * 2.4 + Vector3.new(0, 2.4, 0)
-	local popCFrame = CFrame.new(popPosition) * CFrame.Angles(0, math.rad(random:NextInteger(-35, 35)), 0)
+	local popCFrame = CFrame.new(popPosition) * CFrame.Angles(0, math.rad(random:NextNumber(-35, 35)), 0)
 	local popTween = tweenCoinToCFrame(coin, popCFrame, (COIN_COLLECT_ANIMATION_SECONDS * 0.25), Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
 	popTween.Completed:Connect(function()
@@ -314,7 +347,7 @@ local function spawnCoin()
 		return false
 	end
 
-	if getActiveCoinCount() >= UpgradeService.GetServerMaxActiveCoins() then
+	if getActiveCoinCount() >= getServerMaxActiveCoins() then
 		return false
 	end
 
@@ -323,7 +356,6 @@ local function spawnCoin()
 	removeCoinGridDecor(coin)
 	styleCoin(coin)
 	setCoinCFrame(coin, getRandomCoinCFrame())
-	addBaseplateGridLines(coin)
 	coin.Parent = Workspace
 	activeCoins[coin] = true
 
@@ -340,7 +372,7 @@ local function spawnCoin()
 end
 
 function CoinService.FillCoinsToLimit()
-	local maxActiveCoins = UpgradeService.GetServerMaxActiveCoins()
+	local maxActiveCoins = getServerMaxActiveCoins()
 
 	while getActiveCoinCount() < maxActiveCoins do
 		if not spawnCoin() then
