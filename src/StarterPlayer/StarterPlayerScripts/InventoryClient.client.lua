@@ -627,12 +627,16 @@ local function getCompressedContentLayout()
 	local defaultPosition = baseLayout.ContentDefaultPosition or ui.InventoryContent.Position
 	local defaultSize = baseLayout.ContentDefaultSize or ui.InventoryContent.Size
 	local panelWidth = ui.ItemInfoPanel and ui.ItemInfoPanel.AbsoluteSize.X or 0
-	local gap = 20
-	local compression = panelWidth + gap
-	local minWidth = ResponsiveUI.IsMobileLike() and 220 or 300
-	local defaultAbsoluteSize = baseLayout.ContentDefaultAbsoluteSize or ui.InventoryContent.AbsoluteSize
+	local gap = ResponsiveUI.IsMobileLike() and 12 or 20
+	local compression = ResponsiveUI.IsMobileLike() and ((panelWidth * 0.85) + gap) or (panelWidth + gap)
+	local profileName = getUIProfileName()
+	local minWidth = profileName == "SmallMobile" and 180 or (profileName == "Mobile" and 200 or 300)
+	local defaultAbsoluteSize = ui.InventoryContent.AbsoluteSize
+	if baseLayout.ContentDefaultAbsoluteSize and not ResponsiveUI.IsMobileLike() then
+		defaultAbsoluteSize = baseLayout.ContentDefaultAbsoluteSize
+	end
 	local allowedCompression = math.max(0, math.min(compression, math.max(0, defaultAbsoluteSize.X - minWidth)))
-	local shift = math.min(20, allowedCompression * 0.25)
+	local shift = ResponsiveUI.IsMobileLike() and math.min(28, allowedCompression * 0.35) or math.min(20, allowedCompression * 0.25)
 
 	return UDim2.new(
 		defaultPosition.X.Scale,

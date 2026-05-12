@@ -43,12 +43,17 @@ local rewardPulseToken = 0
 local rewardCoinToken = 0
 local offerCoinToken = 0
 local offerCoinsOfferId
+local pendingIntroDialogState
+local touchTooltipToken = 0
 local answer1Action
 local answer2Action
 local introPlayedForInventoryOpen = false
 local lastInventoryVisible = false
 local rewardOverlayOpen = false
 local visualRandom = Random.new()
+local hideTooltip
+local stopOfferFallingCoins
+local stopRewardEffects
 
 local function hasCustomAssetId(assetId)
 	return type(assetId) == "string" and assetId ~= "" and assetId ~= "rbxassetid://0"
@@ -119,7 +124,21 @@ end
 local localNotificationEvent = getOrCreateLocalNotificationEvent()
 
 local function notify(notificationType, message)
-	localNotificationEvent:Fire(notificationType or "Error", message or "Ошибка")
+	local mappedType = notificationType or "Error"
+	local mappedMessage = message or "Ошибка"
+
+	if mappedType == "NotEnough" then
+		mappedMessage = "Не хватает монет"
+	elseif mappedType == "Error" then
+		mappedMessage = "Ошибка покупки"
+	elseif mappedType == "Limit" then
+		mappedMessage = "Предложение уже куплено"
+	elseif mappedType == "Success" then
+		mappedType = "Claimed"
+		mappedMessage = "Товары куплены"
+	end
+
+	localNotificationEvent:Fire(mappedType, mappedMessage)
 end
 
 local function findChild(parent, name)
@@ -201,7 +220,7 @@ local function styleText(label, maxTextSize)
 	end
 
 	constraint.MinTextSize = 10
-	constraint.MaxTextSize = maxTextSize or 28
+	constraint.MaxTextSize = math.min(maxTextSize or 28, getUIProfileName() == "SmallMobile" and 13 or (getUIProfileName() == "Mobile" and 16 or (maxTextSize or 28)))
 end
 
 local function setButtonText(button, text)
@@ -257,6 +276,7 @@ local function cacheGui()
 
 	ui.TraderBackground = findChild(ui.PackTraderFrame, "TraderBackground")
 	ui.TraderImage = findChild(ui.PackTraderFrame, "TraderImage")
+	ui.CoinRainLayer = ui.PackTraderFrame and ui.PackTraderFrame:FindFirstChild("CoinRainLayer")
 	ui.IntroOverlay = ui.PackTraderFrame and ui.PackTraderFrame:FindFirstChild("IntroOverlay")
 	ui.DarkFade = ui.IntroOverlay and ui.IntroOverlay:FindFirstChild("DarkFade")
 	ui.MistFade = ui.IntroOverlay and ui.IntroOverlay:FindFirstChild("MistFade")
@@ -303,6 +323,19 @@ end
 local function ensureIntroOverlay()
 	if not ui.PackTraderFrame then
 		return
+	end
+
+	if not ui.CoinRainLayer then
+		ui.CoinRainLayer = Instance.new("Frame")
+		ui.CoinRainLayer.Name = "CoinRainLayer"
+		ui.CoinRainLayer.BackgroundTransparency = 1
+		ui.CoinRainLayer.ClipsDescendants = true
+		ui.CoinRainLayer.Active = false
+		ui.CoinRainLayer.Selectable = false
+		ui.CoinRainLayer.Size = UDim2.fromScale(1, 1)
+		ui.CoinRainLayer.Position = UDim2.fromScale(0, 0)
+		ui.CoinRainLayer.ZIndex = 2
+		ui.CoinRainLayer.Parent = ui.PackTraderFrame
 	end
 
 	if not ui.IntroOverlay then
@@ -364,6 +397,12 @@ local function captureBaseLayout()
 		baseLayout.OffersOpenSize = ui.OffersPanel.Size
 	end
 
+	if ui.BackToDialogButton then
+		baseLayout.BackButtonDefaultAnchorPoint = ui.BackToDialogButton.AnchorPoint
+		baseLayout.BackButtonDefaultPosition = ui.BackToDialogButton.Position
+		baseLayout.BackButtonDefaultSize = ui.BackToDialogButton.Size
+	end
+
 	if ui.PurchaseRewardPanel then
 		baseLayout.RewardOpenPosition = ui.PurchaseRewardPanel.Position
 		baseLayout.RewardOpenSize = ui.PurchaseRewardPanel.Size
@@ -395,6 +434,23 @@ local function applyAssets()
 	setImageOrFallback(ui.DarkFade, traderAssets.DarkFadeImage, Color3.fromRGB(0, 0, 0))
 	setImageOrFallback(ui.MistFade, traderAssets.MistFadeImage, Color3.fromRGB(210, 220, 235))
 	setImageOrFallback(ui.RewardBackground, traderAssets.RewardBackground, Color3.fromRGB(24, 32, 42))
+
+	if ui.TraderBackground then
+		ui.TraderBackground.ZIndex = math.min(ui.TraderBackground.ZIndex, 1)
+	end
+	if ui.CoinRainLayer then
+		ui.CoinRainLayer.ZIndex = 2
+	end
+	for _, object in ipairs({ ui.TraderImage, ui.DialogPanel, ui.OffersPanel }) do
+		if object then
+			object.ZIndex = math.max(object.ZIndex, 10)
+			for _, descendant in ipairs(object:GetDescendants()) do
+				if descendant:IsA("GuiObject") then
+					descendant.ZIndex = math.max(descendant.ZIndex, object.ZIndex + 1)
+				end
+			end
+		end
+	end
 
 	for _, slot in ipairs(offerSlots) do
 		local background = slot and slot:FindFirstChild("SlotBackground")
@@ -580,8 +636,32 @@ local function typeDialogText(fullText, onComplete)
 	end)
 end
 
-local function playIntroOverlay()
+local function setTraderContentVisible(isVisible)
+	if ui.TraderImage then
+		ui.TraderImage.Visible = isVisible
+	end
+	if ui.DialogPanel then
+		ui.DialogPanel.Visible = isVisible and ui.DialogPanel.Visible or false
+	end
+	if ui.OffersPanel then
+		ui.OffersPanel.Visible = isVisible and ui.OffersPanel.Visible or false
+	end
+	if ui.PurchaseRewardOverlay then
+		ui.PurchaseRewardOverlay.Visible = isVisible and ui.PurchaseRewardOverlay.Visible or false
+	end
+	hideTooltip()
+end
+
+local function playIntroOverlay(onComplete)
+	cancelDialogText()
+	currentTraderView = "Intro"
+	setTraderContentVisible(false)
+	stopOfferFallingCoins()
+
 	if not ui.IntroOverlay or not ui.DarkFade or not ui.MistFade then
+		if onComplete then
+			onComplete()
+		end
 		return
 	end
 
@@ -606,6 +686,9 @@ local function playIntroOverlay()
 	task.delay(0.72, function()
 		if ui.IntroOverlay then
 			ui.IntroOverlay.Visible = false
+		end
+		if onComplete then
+			onComplete()
 		end
 	end)
 end
@@ -705,14 +788,42 @@ local function hideOffersPanel()
 	ui.OffersPanel.Position = baseLayout.OffersOpenPosition or ui.OffersPanel.Position
 end
 
+local function restoreBackButtonLayout()
+	if ui.BackToDialogButton then
+		ui.BackToDialogButton.AnchorPoint = baseLayout.BackButtonDefaultAnchorPoint or ui.BackToDialogButton.AnchorPoint
+		ui.BackToDialogButton.Position = baseLayout.BackButtonDefaultPosition or ui.BackToDialogButton.Position
+		ui.BackToDialogButton.Size = baseLayout.BackButtonDefaultSize or ui.BackToDialogButton.Size
+	end
+end
+
+local function applySoldOutBackButtonLayout()
+	if ui.BackToDialogButton then
+		ui.BackToDialogButton.Visible = true
+		ui.BackToDialogButton.AnchorPoint = Vector2.new(0.5, 1)
+		ui.BackToDialogButton.Position = UDim2.fromScale(0.5, 0.92)
+		ui.BackToDialogButton.Size = UDim2.new(0.36, 0, 0, 54)
+	end
+end
+
 local showGreeting
 local showOffers
 local showSpecialDialog
 
 showGreeting = function()
+	cancelDialogText()
 	currentTraderView = "Dialog"
 	latestDialogState = "Greeting"
 	setTraderImage("Greeting")
+	if ui.TraderImage then
+		ui.TraderImage.Visible = true
+	end
+	if ui.PurchaseRewardOverlay then
+		ui.PurchaseRewardOverlay.Visible = false
+	end
+	rewardOverlayOpen = false
+	stopRewardEffects()
+	stopOfferFallingCoins()
+	restoreBackButtonLayout()
 	hideOffersPanel()
 	showDialogPanel()
 	local rarity = latestOffer and (latestOffer.Rarity or getOfferRarity(latestOffer.TotalItemAmount)) or "Необычными"
@@ -720,15 +831,25 @@ showGreeting = function()
 	typeDialogText(text, function()
 		showAnswerButtons("Покажи свои товары", showOffers, "Пока просто смотрю", function()
 			typeDialogText("Смотри, сколько хочешь.", function()
-				task.delay(0.15, showOffers)
+				local flowToken = dialogToken
+				task.delay(0.15, function()
+					if flowToken == dialogToken and currentTraderView == "Dialog" then
+						showOffers()
+					end
+				end)
 			end)
 		end)
 	end)
 end
 
 showSpecialDialog = function(state)
-	currentTraderView = "Dialog"
+	cancelDialogText()
+	currentTraderView = state
 	latestDialogState = state
+	stopOfferFallingCoins()
+	if ui.TraderImage then
+		ui.TraderImage.Visible = true
+	end
 	hideOffersPanel()
 	showDialogPanel()
 	setTraderImage(state)
@@ -782,9 +903,9 @@ end
 local function layoutOfferSlots(count)
 	local positions = {
 		[1] = { 0.5 },
-		[2] = { 0.32, 0.68 },
-		[3] = { 0.2, 0.5, 0.8 },
-		[4] = { 0.125, 0.375, 0.625, 0.875 },
+		[2] = { 0.35, 0.65 },
+		[3] = { 0.25, 0.5, 0.75 },
+		[4] = { 0.16, 0.38, 0.62, 0.84 },
 	}
 	local xPositions = positions[count] or positions[4]
 
@@ -867,7 +988,7 @@ local function showTooltip(item, screenPosition)
 	ui.TraderTooltip.Position = getClampedTooltipPosition(screenPosition or UserInputService:GetMouseLocation())
 end
 
-local function hideTooltip()
+hideTooltip = function()
 	if ui.TraderTooltip then
 		ui.TraderTooltip.Visible = false
 	end
@@ -937,10 +1058,10 @@ local function spawnFallingCoins(layer, tokenGetter)
 	end
 end
 
-local function stopOfferFallingCoins()
+stopOfferFallingCoins = function()
 	offerCoinToken += 1
 	offerCoinsOfferId = nil
-	clearLayer(ui.FallingCoinsLayer)
+	clearLayer(ui.CoinRainLayer or ui.FallingCoinsLayer)
 end
 
 local function startOfferFallingCoins()
@@ -962,7 +1083,7 @@ local function startOfferFallingCoins()
 	local token = offerCoinToken
 	task.spawn(function()
 		while token == offerCoinToken and ui.OffersPanel and ui.OffersPanel.Visible and latestOffer and not latestOffer.Purchased do
-			spawnFallingCoins(ui.FallingCoinsLayer, function()
+			spawnFallingCoins(ui.CoinRainLayer or ui.FallingCoinsLayer, function()
 				return offerCoinToken
 			end)
 			task.wait(1.4)
@@ -974,7 +1095,7 @@ local function startOfferFallingCoins()
 	end)
 end
 
-local function stopRewardEffects()
+stopRewardEffects = function()
 	rewardPulseToken += 1
 	rewardCoinToken += 1
 	clearLayer(ui.RewardFallingCoinsLayer)
@@ -1152,27 +1273,48 @@ local function isPointInsideGui(guiObject, point)
 		and point.Y <= pos.Y + size.Y
 end
 
-local function updateOfferSlots(offer)
-	local items = offer and offer.Items or {}
-	layoutOfferSlots(#items)
+local function resetOfferSlot(slot)
+	if not slot then
+		return
+	end
 
-	for index, slot in ipairs(offerSlots) do
+	slot.Visible = false
+	slot:SetAttribute("ItemId", nil)
+	local icon = slot:FindFirstChild("ItemIcon")
+	if icon and (icon:IsA("ImageLabel") or icon:IsA("ImageButton")) then
+		icon.Image = ""
+		icon.ImageTransparency = 1
+	end
+	local count = slot:FindFirstChild("ItemCount")
+	if count and count:IsA("TextLabel") then
+		count.Text = ""
+	end
+end
+
+local function updateOfferSlots(offer)
+	for _, slot in ipairs(offerSlots) do
+		resetOfferSlot(slot)
+	end
+
+	local items = (offer and not offer.Purchased and offer.Items) or {}
+	local visibleCount = math.min(#items, #offerSlots)
+	layoutOfferSlots(visibleCount)
+
+	for index = 1, visibleCount do
+		local slot = offerSlots[index]
 		local item = items[index]
 
 		if slot and item and ItemConfig[item.ItemId] then
 			slot.Visible = true
 			local icon = slot:FindFirstChild("ItemIcon")
 			local count = slot:FindFirstChild("ItemCount")
+			local background = slot:FindFirstChild("SlotBackground")
+			setImageOrFallback(background, getPackTraderAssets().OfferSlotBackground, Color3.fromRGB(28, 36, 48))
 			setImageOrFallback(icon, getItemIcon(item.ItemId), Color3.fromRGB(40, 48, 56))
 			if count and count:IsA("TextLabel") then
-				count.Text = "x" .. tostring(item.Amount)
+				count.Text = "x" .. tostring(item.Amount or 0)
 			end
 			slot:SetAttribute("ItemId", item.ItemId)
-		else
-			if slot then
-				slot.Visible = false
-				slot:SetAttribute("ItemId", nil)
-			end
 		end
 	end
 end
@@ -1189,10 +1331,10 @@ local function updateOfferText(offer)
 	if offer.Purchased then
 		stopOfferFallingCoins()
 		if ui.OfferTitleText then
-			ui.OfferTitleText.Text = "Товары закончились"
+			ui.OfferTitleText.Visible = false
 		end
 		if ui.OfferPriceText then
-			ui.OfferPriceText.Text = "Подожди обновления магазина."
+			ui.OfferPriceText.Visible = false
 		end
 		if ui.BuyOfferButton then
 			ui.BuyOfferButton.Visible = false
@@ -1201,11 +1343,14 @@ local function updateOfferText(offer)
 			ui.OfferItemsFrame.Visible = false
 		end
 		if ui.SoldOutText then
+			ui.SoldOutText.Text = "Предложение уже куплено"
 			ui.SoldOutText.Visible = true
 		end
+		applySoldOutBackButtonLayout()
 		return
 	end
 
+	restoreBackButtonLayout()
 	if ui.OfferItemsFrame then
 		ui.OfferItemsFrame.Visible = true
 	end
@@ -1214,10 +1359,12 @@ local function updateOfferText(offer)
 	end
 
 	if ui.OfferTitleText then
+		ui.OfferTitleText.Visible = true
 		ui.OfferTitleText.Text = "Сегодня могу предложить:"
 	end
 
 	if ui.OfferPriceText then
+		ui.OfferPriceText.Visible = true
 		ui.OfferPriceText.Text = "Цена: " .. FormatNumber(offer.Price or 0) .. " Coins"
 	end
 
@@ -1238,7 +1385,7 @@ end
 
 showOffers = function()
 	cancelDialogText()
-	currentTraderView = "Offers"
+	currentTraderView = latestOffer and latestOffer.Purchased and "SoldOut" or "Offers"
 	latestDialogState = latestOffer and latestOffer.Purchased and "SoldOut" or "Offers"
 	setTraderImage("Offers")
 	hideDialogPanel()
@@ -1261,10 +1408,11 @@ local function openPackTrader()
 	end
 
 	setPackTraderVisible(true)
-	showGreeting()
 	if not introPlayedForInventoryOpen then
-		playIntroOverlay()
+		playIntroOverlay(showGreeting)
 		introPlayedForInventoryOpen = true
+	else
+		showGreeting()
 	end
 	packTraderActionRemote:FireServer({ Action = "OpenTrader" })
 end
@@ -1318,7 +1466,10 @@ local function hookButtons()
 	end
 
 	if ui.BackToDialogButton and ui.BackToDialogButton:IsA("GuiButton") then
-		ui.BackToDialogButton.MouseButton1Click:Connect(showGreeting)
+		ui.BackToDialogButton.MouseButton1Click:Connect(function()
+			cancelDialogText()
+			showGreeting()
+		end)
 	end
 
 	if ui.BuyOfferButton and ui.BuyOfferButton:IsA("GuiButton") then
@@ -1353,7 +1504,20 @@ local function hookButtons()
 				end
 			end)
 			slot.InputBegan:Connect(function(input)
-				if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+				if input.UserInputType == Enum.UserInputType.Touch then
+					touchTooltipToken += 1
+					local token = touchTooltipToken
+					local position = Vector2.new(input.Position.X, input.Position.Y)
+					task.delay(0.35, function()
+						if token ~= touchTooltipToken then
+							return
+						end
+						local itemId = slot:GetAttribute("ItemId")
+						if itemId then
+							showTooltip({ ItemId = itemId }, position)
+						end
+					end)
+				elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
 					local itemId = slot:GetAttribute("ItemId")
 					if itemId then
 						showTooltip({ ItemId = itemId }, Vector2.new(input.Position.X, input.Position.Y))
@@ -1362,6 +1526,7 @@ local function hookButtons()
 			end)
 			slot.InputEnded:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+					touchTooltipToken += 1
 					hideTooltip()
 				end
 			end)
@@ -1385,14 +1550,23 @@ local function hookButtons()
 			end)
 			slot.InputBegan:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.Touch then
-					local itemId = slot:GetAttribute("ItemId")
-					if itemId then
-						showTooltip({ ItemId = itemId }, Vector2.new(input.Position.X, input.Position.Y))
-					end
+					touchTooltipToken += 1
+					local token = touchTooltipToken
+					local position = Vector2.new(input.Position.X, input.Position.Y)
+					task.delay(0.35, function()
+						if token ~= touchTooltipToken then
+							return
+						end
+						local itemId = slot:GetAttribute("ItemId")
+						if itemId then
+							showTooltip({ ItemId = itemId }, position)
+						end
+					end)
 				end
 			end)
 			slot.InputEnded:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.Touch then
+					touchTooltipToken += 1
 					hideTooltip()
 				end
 			end)
@@ -1446,16 +1620,16 @@ local function handleSync(payload)
 		return
 	end
 
-	if payload.DialogState == "Suspicious" and latestDialogState ~= "Suspicious" then
+	if currentTraderView == "Intro" then
+		return
+	end
+
+	if payload.DialogState == "Suspicious" and currentTraderView ~= "Suspicious" then
 		showSpecialDialog("Suspicious")
-	elseif payload.DialogState == "Angry" and latestDialogState ~= "Angry" then
+	elseif payload.DialogState == "Angry" and currentTraderView ~= "Angry" then
 		showSpecialDialog("Angry")
-	elseif currentTraderView == "Offers" then
+	elseif currentTraderView == "Offers" or currentTraderView == "SoldOut" then
 		keepOffersPanelVisible()
-	elseif payload.DialogState == "SoldOut" and latestDialogState ~= "SoldOut" then
-		showOffers()
-	elseif payload.DialogState == "Greeting" and latestDialogState ~= "Greeting" then
-		showGreeting()
 	end
 end
 
