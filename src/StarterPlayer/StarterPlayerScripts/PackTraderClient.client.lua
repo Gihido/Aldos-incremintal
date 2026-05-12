@@ -33,6 +33,7 @@ local ui = {}
 local baseLayout = {}
 local latestOffer
 local latestDialogState = "Greeting"
+local currentTraderView = "Dialog"
 local offerSlots = {}
 local activeTooltipSlot
 local dialogToken = 0
@@ -235,7 +236,11 @@ local function cacheGui()
 	ui.OfferPriceText = findChild(ui.OffersPanel, "OfferPriceText")
 	ui.BuyOfferButton = findChild(ui.OffersPanel, "BuyOfferButton")
 	ui.BackToDialogButton = findChild(ui.OffersPanel, "BackToDialogButton")
-	ui.TraderTooltip = findChild(ui.PackTraderFrame, "TraderTooltip")
+	ui.ItemTooltip = findChild(gui, "ItemTooltip")
+	ui.TraderTooltip = ui.ItemTooltip or (ui.PackTraderFrame and ui.PackTraderFrame:FindFirstChild("TraderTooltip"))
+	if ui.TraderTooltip and ui.TraderTooltip.Parent ~= gui then
+		ui.TraderTooltip.Parent = gui
+	end
 	ui.TooltipBackground = findChild(ui.TraderTooltip, "TooltipBackground")
 	ui.TooltipName = findChild(ui.TraderTooltip, "TooltipName")
 	ui.TooltipBoost = findChild(ui.TraderTooltip, "TooltipBoost")
@@ -313,6 +318,11 @@ local function captureBaseLayout()
 		baseLayout.ItemInfoOpenPosition = ui.ItemInfoPanel.Position
 		baseLayout.ItemInfoOpenSize = ui.ItemInfoPanel.Size
 	end
+
+	if ui.InventoryContent then
+		baseLayout.InventoryContentOpenPosition = ui.InventoryContent.Position
+		baseLayout.InventoryContentOpenSize = ui.InventoryContent.Size
+	end
 end
 
 local function applyAssets()
@@ -324,7 +334,7 @@ local function applyAssets()
 	setImageOrFallback(ui.OffersBackground, traderAssets.OffersBackground, Color3.fromRGB(24, 32, 44))
 	setImageOrFallback(ui.BuyOfferButton, traderAssets.BuyButtonBackground, Color3.fromRGB(55, 110, 55))
 	setImageOrFallback(ui.BackToDialogButton, traderAssets.BackButtonBackground, Color3.fromRGB(55, 75, 110))
-	setImageOrFallback(ui.TooltipBackground, traderAssets.TooltipBackground, Color3.fromRGB(22, 30, 42))
+	setImageOrFallback(ui.TooltipBackground, getMainAssets().TooltipBackground, Color3.fromRGB(22, 30, 42))
 	setImageOrFallback(ui.AnswerButton1, traderAssets.AnswerButtonBackground, Color3.fromRGB(45, 70, 95))
 	setImageOrFallback(ui.AnswerButton2, traderAssets.AnswerButtonBackground, Color3.fromRGB(45, 70, 95))
 	setImageOrFallback(ui.DarkFade, traderAssets.DarkFadeImage, Color3.fromRGB(0, 0, 0))
@@ -394,6 +404,11 @@ local function hideAnswerButtons()
 	if ui.AnswerButton2 then
 		ui.AnswerButton2.Visible = false
 	end
+end
+
+local function cancelDialogText()
+	dialogToken += 1
+	hideAnswerButtons()
 end
 
 local function typeDialogText(fullText, onComplete)
@@ -483,7 +498,18 @@ local function setPackTraderVisible(isVisible)
 	end
 end
 
+local function restoreInventoryContent()
+	if ui.InventoryContent and baseLayout.InventoryContentOpenPosition and baseLayout.InventoryContentOpenSize then
+		TweenService:Create(ui.InventoryContent, TWEEN_OUT, {
+			Position = baseLayout.InventoryContentOpenPosition,
+			Size = baseLayout.InventoryContentOpenSize,
+		}):Play()
+	end
+end
+
 local function closeItemInfoPanel()
+	restoreInventoryContent()
+
 	if not ui.ItemInfoPanel or not ui.ItemInfoPanel.Visible then
 		return
 	end
@@ -532,6 +558,18 @@ local function showOffersPanel()
 	}):Play()
 end
 
+local function keepOffersPanelVisible()
+	if ui.DialogPanel then
+		ui.DialogPanel.Visible = false
+		ui.DialogPanel.Position = baseLayout.DialogOpenPosition or ui.DialogPanel.Position
+	end
+
+	if ui.OffersPanel then
+		ui.OffersPanel.Visible = true
+		ui.OffersPanel.Position = baseLayout.OffersOpenPosition or ui.OffersPanel.Position
+	end
+end
+
 local function hideOffersPanel()
 	if not ui.OffersPanel then
 		return
@@ -546,6 +584,7 @@ local showOffers
 local showSpecialDialog
 
 showGreeting = function()
+	currentTraderView = "Dialog"
 	latestDialogState = "Greeting"
 	setTraderImage("Greeting")
 	hideOffersPanel()
@@ -562,6 +601,7 @@ showGreeting = function()
 end
 
 showSpecialDialog = function(state)
+	currentTraderView = "Dialog"
 	latestDialogState = state
 	hideOffersPanel()
 	showDialogPanel()
@@ -616,7 +656,54 @@ local function layoutOfferSlots(count)
 	end
 end
 
-local function showTooltip(item, position)
+local function getTooltipBackground(itemId)
+	local itemAssets = getItemAssets(itemId)
+	if hasCustomAssetId(itemAssets.TooltipBackground) then
+		return itemAssets.TooltipBackground
+	end
+
+	return getMainAssets().TooltipBackground
+end
+
+local function setTooltipZIndex(root, zIndex)
+	if not root then
+		return
+	end
+
+	if root:IsA("GuiObject") then
+		root.ZIndex = zIndex
+	end
+
+	for _, descendant in ipairs(root:GetDescendants()) do
+		if descendant:IsA("GuiObject") then
+			descendant.ZIndex = math.max(descendant.ZIndex, zIndex + 1)
+		end
+	end
+end
+
+local function getClampedTooltipPosition(screenPosition)
+	local camera = Workspace.CurrentCamera
+	local viewport = camera and camera.ViewportSize or Vector2.new(1920, 1080)
+	local padding = 12
+	local size = ui.TraderTooltip and ui.TraderTooltip.AbsoluteSize or Vector2.new(220, 120)
+	local x = screenPosition.X + 18
+	local y = screenPosition.Y + 18
+
+	if x + size.X + padding > viewport.X then
+		x = screenPosition.X - size.X - 18
+	end
+
+	if y + size.Y + padding > viewport.Y then
+		y = screenPosition.Y - size.Y - 18
+	end
+
+	x = math.clamp(x, padding, math.max(padding, viewport.X - size.X - padding))
+	y = math.clamp(y, padding, math.max(padding, viewport.Y - size.Y - padding))
+
+	return UDim2.fromOffset(x, y)
+end
+
+local function showTooltip(item, screenPosition)
 	if not ui.TraderTooltip or not item then
 		return
 	end
@@ -626,10 +713,16 @@ local function showTooltip(item, position)
 		return
 	end
 
+	if ui.TraderTooltip.Parent ~= gui then
+		ui.TraderTooltip.Parent = gui
+	end
+
+	setImageOrFallback(ui.TooltipBackground, getTooltipBackground(item.ItemId), Color3.fromRGB(24, 32, 42))
 	ui.TooltipName.Text = definition.DisplayName
-	ui.TooltipBoost.Text = string.format("%s\n%s", definition.BoostText, definition.Description)
-	ui.TraderTooltip.Position = position or UDim2.fromOffset(0, 0)
+	ui.TooltipBoost.Text = string.format("%s / %ss\n%s", definition.BoostText, tostring(definition.Duration or "?"), definition.Description or "")
+	setTooltipZIndex(ui.TraderTooltip, 1000)
 	ui.TraderTooltip.Visible = true
+	ui.TraderTooltip.Position = getClampedTooltipPosition(screenPosition or UserInputService:GetMouseLocation())
 end
 
 local function hideTooltip()
@@ -706,6 +799,8 @@ local function updateOffer(offer)
 end
 
 showOffers = function()
+	cancelDialogText()
+	currentTraderView = "Offers"
 	latestDialogState = latestOffer and latestOffer.Purchased and "SoldOut" or "Offers"
 	setTraderImage("Offers")
 	hideDialogPanel()
@@ -734,6 +829,10 @@ local function openPackTrader()
 end
 
 local function closePackTrader()
+	cancelDialogText()
+	hideTooltip()
+	currentTraderView = "Dialog"
+
 	if ui.PackTraderFrame and ui.PackTraderFrame.Visible then
 		setPackTraderVisible(false)
 	end
@@ -785,7 +884,7 @@ local function hookButtons()
 				end
 				activeTooltipSlot = slot
 				local mousePosition = UserInputService:GetMouseLocation()
-				showTooltip({ ItemId = itemId }, UDim2.fromOffset(mousePosition.X + 14, mousePosition.Y + 12))
+				showTooltip({ ItemId = itemId }, mousePosition)
 			end)
 			slot.MouseLeave:Connect(function()
 				if activeTooltipSlot == slot then
@@ -796,7 +895,7 @@ local function hookButtons()
 				if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
 					local itemId = slot:GetAttribute("ItemId")
 					if itemId then
-						showTooltip({ ItemId = itemId }, UDim2.fromOffset(input.Position.X + 12, input.Position.Y + 12))
+						showTooltip({ ItemId = itemId }, Vector2.new(input.Position.X, input.Position.Y))
 					end
 				end
 			end)
@@ -821,6 +920,9 @@ local function updateTimerLoop()
 				lastInventoryVisible = ui.InventoryMain.Visible
 				if not lastInventoryVisible then
 					introPlayedForInventoryOpen = false
+					currentTraderView = "Dialog"
+					cancelDialogText()
+					hideTooltip()
 				end
 			end
 			task.wait(1)
@@ -849,6 +951,8 @@ local function handleSync(payload)
 		showSpecialDialog("Suspicious")
 	elseif payload.DialogState == "Angry" and latestDialogState ~= "Angry" then
 		showSpecialDialog("Angry")
+	elseif currentTraderView == "Offers" then
+		keepOffersPanelVisible()
 	elseif payload.DialogState == "SoldOut" and latestDialogState ~= "SoldOut" then
 		showOffers()
 	elseif payload.DialogState == "Greeting" and latestDialogState ~= "Greeting" then

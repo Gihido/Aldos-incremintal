@@ -413,7 +413,11 @@ end
 
 local function getTooltipBackground(itemId)
 	local itemAssets = getItemAssets(itemId)
-	return itemAssets.TooltipBackground or getMainAssets().TooltipBackground
+	if hasCustomAssetId(itemAssets.TooltipBackground) then
+		return itemAssets.TooltipBackground
+	end
+
+	return getMainAssets().TooltipBackground
 end
 
 local function getBuffTooltipBackground(itemId)
@@ -482,6 +486,7 @@ local function cacheGui()
 	ui.InventoryContent = findChild(ui.InventoryMain, "InventoryContent")
 	ui.ItemsTabButton = getNested(ui.InventoryMain, { "CategoryPanel", "ItemsTabButton" })
 	ui.PassivesTabButton = getNested(ui.InventoryMain, { "CategoryPanel", "PassivesTabButton" })
+	ui.PackTraderTabButton = getNested(ui.InventoryMain, { "CategoryPanel", "PackTraderTabButton" })
 	ui.ItemsScroll = getNested(ui.InventoryContent, { "ItemsScroll" })
 	ui.PassivesScroll = getNested(ui.InventoryContent, { "PassivesScroll" })
 	ui.ItemInfoPanel = findChild(ui.InventoryMain, "ItemInfoPanel")
@@ -598,6 +603,7 @@ local function captureBaseLayout()
 	if ui.InventoryContent and not baseLayout.ContentDefaultPosition then
 		baseLayout.ContentDefaultPosition = ui.InventoryContent.Position
 		baseLayout.ContentDefaultSize = ui.InventoryContent.Size
+		baseLayout.ContentDefaultAbsoluteSize = ui.InventoryContent.AbsoluteSize
 	end
 end
 
@@ -614,7 +620,7 @@ getInfoHiddenPosition = function()
 end
 
 local function getCompressedContentLayout()
-	if not ui.InventoryContent then
+	if not ui.InventoryContent or currentTab ~= "Items" then
 		return nil, nil
 	end
 
@@ -623,12 +629,9 @@ local function getCompressedContentLayout()
 	local panelWidth = ui.ItemInfoPanel and ui.ItemInfoPanel.AbsoluteSize.X or 0
 	local gap = 20
 	local compression = panelWidth + gap
-	local minWidth = 280
-	local currentWidth = ui.InventoryContent.AbsoluteSize.X
-	if baseLayout.ContentDefaultSize then
-		currentWidth += (baseLayout.ContentDefaultSize.X.Offset - ui.InventoryContent.Size.X.Offset)
-	end
-	local allowedCompression = math.max(0, math.min(compression, math.max(0, currentWidth - minWidth)))
+	local minWidth = ResponsiveUI.IsMobileLike() and 220 or 300
+	local defaultAbsoluteSize = baseLayout.ContentDefaultAbsoluteSize or ui.InventoryContent.AbsoluteSize
+	local allowedCompression = math.max(0, math.min(compression, math.max(0, defaultAbsoluteSize.X - minWidth)))
 	local shift = math.min(20, allowedCompression * 0.25)
 
 	return UDim2.new(
@@ -652,7 +655,7 @@ local function tweenInventoryContent(compressed)
 	local targetPosition
 	local targetSize
 
-	if compressed then
+	if compressed and currentTab == "Items" then
 		targetPosition, targetSize = getCompressedContentLayout()
 	else
 		targetPosition = baseLayout.ContentDefaultPosition or ui.InventoryContent.Position
@@ -917,22 +920,57 @@ local function formatTooltipRemaining(seconds)
 	return `{seconds}s`
 end
 
+local function getScreenPosition(position)
+	if typeof(position) == "Vector2" then
+		return position
+	elseif typeof(position) == "UDim2" then
+		return Vector2.new(position.X.Offset, position.Y.Offset)
+	end
+
+	return UserInputService:GetMouseLocation()
+end
+
+local function setTooltipZIndex(root, zIndex)
+	if not root then
+		return
+	end
+
+	if root:IsA("GuiObject") then
+		root.ZIndex = zIndex
+	end
+
+	for _, descendant in ipairs(root:GetDescendants()) do
+		if descendant:IsA("GuiObject") then
+			descendant.ZIndex = math.max(descendant.ZIndex, zIndex + 1)
+		end
+	end
+end
+
 local function getClampedTooltipPosition(position)
 	if not ui.ItemTooltip then
-		return position or UDim2.fromOffset(0, 0)
+		return UDim2.fromOffset(0, 0)
 	end
 
 	local viewport = ResponsiveUI.GetViewportSize()
-	local requestedX = position and position.X.Offset or 0
-	local requestedY = position and position.Y.Offset or 0
+	local screenPosition = getScreenPosition(position)
 	local width = ui.ItemTooltip.AbsoluteSize.X * (ui.TooltipScale and ui.TooltipScale.Scale or 1)
 	local height = ui.ItemTooltip.AbsoluteSize.Y * (ui.TooltipScale and ui.TooltipScale.Scale or 1)
 	local padding = 12
+	local x = screenPosition.X + 18
+	local y = screenPosition.Y + 18
 
-	return UDim2.fromOffset(
-		math.clamp(requestedX, padding, math.max(padding, viewport.X - width - padding)),
-		math.clamp(requestedY, padding, math.max(padding, viewport.Y - height - padding))
-	)
+	if x + width + padding > viewport.X then
+		x = screenPosition.X - width - 18
+	end
+
+	if y + height + padding > viewport.Y then
+		y = screenPosition.Y - height - 18
+	end
+
+	x = math.clamp(x, padding, math.max(padding, viewport.X - width - padding))
+	y = math.clamp(y, padding, math.max(padding, viewport.Y - height - padding))
+
+	return UDim2.fromOffset(x, y)
 end
 
 local function showTooltip(itemId, position)
@@ -941,6 +979,10 @@ local function showTooltip(itemId, position)
 	end
 
 	local definition = ItemConfig[itemId]
+	if ui.ItemTooltip.Parent ~= gui then
+		ui.ItemTooltip.Parent = gui
+	end
+	setTooltipZIndex(ui.ItemTooltip, 1000)
 	setImageOrFallback(ui.TooltipBackground, getTooltipBackground(itemId), Color3.fromRGB(24, 32, 42))
 	setText(ui.TooltipName, definition.DisplayName)
 	setText(ui.TooltipBoost, `{definition.BoostText} / {definition.Duration}s`)
@@ -954,6 +996,10 @@ local function showBuffTooltip(buff, position)
 	end
 
 	local definition = ItemConfig[buff.ItemId]
+	if ui.ItemTooltip.Parent ~= gui then
+		ui.ItemTooltip.Parent = gui
+	end
+	setTooltipZIndex(ui.ItemTooltip, 1000)
 	local remaining = (buff.EndTime or os.time()) - os.time()
 	setImageOrFallback(ui.TooltipBackground, getBuffTooltipBackground(buff.ItemId), Color3.fromRGB(24, 32, 42))
 	setText(ui.TooltipName, definition.DisplayName)
@@ -985,7 +1031,7 @@ local function showTab(tabName)
 		updateEmptyStateLabels()
 	end
 
-	if tabName == "Passives" and ui.ItemInfoPanel and ui.ItemInfoPanel.Visible then
+	if tabName ~= "Items" and ui.ItemInfoPanel and ui.ItemInfoPanel.Visible then
 		closeItemInfo()
 		task.delay(0.2, applyTab)
 	else
@@ -1281,6 +1327,7 @@ local function hookButtons()
 	hookButtonEffects(ui.CloseInventoryButton, 1.06, 0.94)
 	hookButtonEffects(ui.ItemsTabButton, 1.04, 0.96)
 	hookButtonEffects(ui.PassivesTabButton, 1.04, 0.96)
+	hookButtonEffects(ui.PackTraderTabButton, 1.04, 0.96)
 	hookButtonEffects(ui.CloseInfoButton, 1.06, 0.94)
 	hookButtonEffects(ui.ActivateButton, 1.05, 0.95)
 	hookButtonEffects(ui.DeleteButton, 1.05, 0.95)
@@ -1302,6 +1349,12 @@ local function hookButtons()
 	if ui.PassivesTabButton and ui.PassivesTabButton:IsA("GuiButton") then
 		ui.PassivesTabButton.MouseButton1Click:Connect(function()
 			showTab("Passives")
+		end)
+	end
+
+	if ui.PackTraderTabButton and ui.PackTraderTabButton:IsA("GuiButton") then
+		ui.PackTraderTabButton.MouseButton1Click:Connect(function()
+			showTab("PackTrader")
 		end)
 	end
 
