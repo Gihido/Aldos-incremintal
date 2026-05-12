@@ -160,6 +160,7 @@ local function generateOffer(player)
 
 	state.Offer = offer
 	state.Purchased = false
+	state.LastPurchasedItems = nil
 	return offer
 end
 
@@ -181,13 +182,11 @@ local function copyOffer(offer, state)
 
 	local items = {}
 
-	if not state.Purchased then
-		for _, item in ipairs(offer.Items or {}) do
-			table.insert(items, {
-				ItemId = item.ItemId,
-				Amount = item.Amount,
-			})
-		end
+	for _, item in ipairs(offer.Items or {}) do
+		table.insert(items, {
+			ItemId = item.ItemId,
+			Amount = item.Amount,
+		})
 	end
 
 	return {
@@ -215,20 +214,40 @@ local function cleanOpenHistory(state, now)
 	return freshHistory
 end
 
-function PackTraderService.SyncPlayer(player, resultType, message, dialogState)
+local function copyItems(items)
+	local copied = {}
+
+	for _, item in ipairs(items or {}) do
+		table.insert(copied, {
+			ItemId = item.ItemId,
+			Amount = item.Amount,
+		})
+	end
+
+	return copied
+end
+
+function PackTraderService.SyncPlayer(player, resultType, message, dialogState, purchaseJustCompleted, lastPurchasedItems)
 	if not player or not syncPackTraderRemote then
 		return
 	end
 
 	local state = getState(player)
 	local offer = getOffer(player)
-	syncPackTraderRemote:FireClient(player, {
+	local payload = {
 		Offer = copyOffer(offer, state),
 		DialogState = dialogState or state.DialogState or "Greeting",
 		FailedBuyAttempts = state.FailedBuyAttempts,
 		ResultType = resultType,
 		Message = message,
-	})
+		PurchaseJustCompleted = purchaseJustCompleted == true,
+	}
+
+	if purchaseJustCompleted then
+		payload.LastPurchasedItems = copyItems(lastPurchasedItems or state.LastPurchasedItems or offer.Items)
+	end
+
+	syncPackTraderRemote:FireClient(player, payload)
 end
 
 function PackTraderService.RefreshOffer(player, resultType, message)
@@ -303,14 +322,17 @@ function PackTraderService.BuyOffer(player)
 		return false, "Not enough Coins"
 	end
 
-	for _, item in ipairs(offer.Items or {}) do
+	local purchasedItems = copyItems(offer.Items)
+
+	for _, item in ipairs(purchasedItems) do
 		ItemService.AddItem(player, item.ItemId, item.Amount)
 	end
 
 	state.Purchased = true
+	state.LastPurchasedItems = purchasedItems
 	state.FailedBuyAttempts = 0
 	state.DialogState = "SoldOut"
-	PackTraderService.SyncPlayer(player, "Success", "Offer purchased", "SoldOut")
+	PackTraderService.SyncPlayer(player, "Success", "Offer purchased", "SoldOut", true, purchasedItems)
 
 	if type(DataService.SavePlayer) == "function" then
 		task.defer(function()

@@ -133,12 +133,19 @@ local UIAssetConfig = {
 
 			DialogBackground = "rbxassetid://0",
 			AnswerButtonBackground = "rbxassetid://0",
+			PositiveAnswerButtonBackground = "rbxassetid://0",
+			NegativeAnswerButtonBackground = "rbxassetid://0",
 
 			OffersBackground = "rbxassetid://0",
 			OfferSlotBackground = "rbxassetid://0",
+			SoldOutBackground = "rbxassetid://0",
+			FallingCoinImage = "rbxassetid://0",
 
 			BuyButtonBackground = "rbxassetid://0",
 			BackButtonBackground = "rbxassetid://0",
+
+			RewardBackground = "rbxassetid://0",
+			RewardSlotBackground = "rbxassetid://0",
 
 			TooltipBackground = "rbxassetid://0",
 		},
