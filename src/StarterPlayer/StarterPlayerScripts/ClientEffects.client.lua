@@ -12,6 +12,12 @@ local NOTIFICATION_CONFIG = {
 	Success = {
 		Color = Color3.fromRGB(90, 255, 130),
 	},
+	Claimed = {
+		Color = Color3.fromRGB(255, 214, 90),
+	},
+	SuccessClaim = {
+		Color = Color3.fromRGB(255, 214, 90),
+	},
 	Limit = {
 		Color = Color3.fromRGB(255, 200, 80),
 	},
@@ -299,6 +305,71 @@ local function getNotificationAssetConfig(notificationType)
 	return (UIAssetConfig.Notifications and UIAssetConfig.Notifications[notificationType]) or {}
 end
 
+local function getClaimCoinImage(assetConfig)
+	if hasCustomAssetId(assetConfig.FallingCoinImage) then
+		return assetConfig.FallingCoinImage
+	end
+
+	local packTraderAssets = UIAssetConfig.Inventory and UIAssetConfig.Inventory.PackTrader or {}
+	return packTraderAssets.FallingCoinImage or "rbxassetid://0"
+end
+
+local function addClaimCoinRain(parent, notificationType, assetConfig)
+	if notificationType ~= "Claimed" and notificationType ~= "SuccessClaim" then
+		return
+	end
+
+	local coinImage = getClaimCoinImage(assetConfig)
+	if not hasCustomAssetId(coinImage) then
+		return
+	end
+
+	local layer = Instance.new("Frame")
+	layer.Name = "ClaimCoinRainLayer"
+	layer.BackgroundTransparency = 1
+	layer.ClipsDescendants = true
+	layer.Active = false
+	layer.Selectable = false
+	layer.Size = UDim2.fromScale(1, 1)
+	layer.Position = UDim2.fromScale(0, 0)
+	layer.ZIndex = parent.ZIndex + 3
+	layer.Parent = parent
+
+	local profileName = ResponsiveUI.GetProfileName()
+	local count = profileName == "SmallMobile" and 4 or (profileName == "Mobile" and 5 or 9)
+	local minSize = profileName == "Desktop" and 10 or 7
+	local maxSize = profileName == "Desktop" and 18 or 12
+	local random = Random.new()
+
+	for _ = 1, count do
+		task.delay(random:NextNumber(0, 0.45), function()
+			if not layer.Parent then
+				return
+			end
+
+			local coin = Instance.new("ImageLabel")
+			coin.Name = "ClaimFallingCoin"
+			coin.BackgroundTransparency = 1
+			coin.Image = coinImage
+			coin.ScaleType = Enum.ScaleType.Fit
+			coin.Active = false
+			coin.Selectable = false
+			coin.ZIndex = layer.ZIndex
+			local size = random:NextInteger(minSize, maxSize)
+			coin.Size = UDim2.fromOffset(size, size)
+			coin.Position = UDim2.fromScale(random:NextNumber(0.05, 0.95), -0.15)
+			coin.Parent = layer
+
+			local duration = random:NextNumber(0.85, 1.45)
+			TweenService:Create(coin, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+				Position = UDim2.fromScale(random:NextNumber(0.05, 0.95), 1.15),
+				Rotation = random:NextInteger(100, 280),
+				ImageTransparency = 0.2,
+			}):Play()
+			game:GetService("Debris"):AddItem(coin, duration + 0.1)
+		end)
+	end
+
 local function getButtonImage(assetConfig, mode)
 	if mode == "BuyMax" then
 		return assetConfig.BuyMaxButtonImage or assetConfig.BuyMaxButtonBackground
@@ -543,7 +614,9 @@ local function showNotification(notificationType, message)
 	addStroke(frame, Color3.fromRGB(245, 245, 235), 2, 0.1)
 	addGradient(frame, config.Color, Color3.fromRGB(38, 40, 42), 0)
 	addImageBackground(frame, assetConfig.BackgroundImage, 0.05, 0.94)
+	addClaimCoinRain(frame, notificationType, assetConfig)
 
+	local contentZIndex = frame.ZIndex + 10
 	local iconBackground = Instance.new("Frame")
 	iconBackground.Name = "IconBackground"
 	iconBackground.BackgroundColor3 = Color3.fromRGB(18, 20, 18)
@@ -551,7 +624,7 @@ local function showNotification(notificationType, message)
 	iconBackground.BorderSizePixel = 0
 	iconBackground.Position = UDim2.fromOffset(profile.Padding, profile.Padding)
 	iconBackground.Size = UDim2.fromOffset(profile.IconBoxSize, profile.IconBoxSize)
-	iconBackground.ZIndex = frame.ZIndex + 4
+	iconBackground.ZIndex = contentZIndex
 	iconBackground.Parent = frame
 	addStroke(iconBackground, Color3.fromRGB(255, 255, 245), 1.5, 0.25)
 
@@ -563,7 +636,7 @@ local function showNotification(notificationType, message)
 	icon.Position = UDim2.fromOffset(profile.IconPadding, profile.IconPadding)
 	icon.ScaleType = Enum.ScaleType.Fit
 	icon.Size = UDim2.fromOffset(iconSize, iconSize)
-	icon.ZIndex = frame.ZIndex + 5
+	icon.ZIndex = contentZIndex + 1
 	icon.Parent = iconBackground
 
 	local label = Instance.new("TextLabel")
@@ -581,7 +654,7 @@ local function showNotification(notificationType, message)
 	label.TextWrapped = true
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.TextYAlignment = Enum.TextYAlignment.Center
-	label.ZIndex = frame.ZIndex + 5
+	label.ZIndex = contentZIndex + 1
 	label.Parent = frame
 	applyAnimatedTextGradient(label)
 

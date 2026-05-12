@@ -91,6 +91,16 @@ local function ensureButtonText(button, defaultText)
 	return buttonText
 end
 
+
+local coinRainLayer = getOrCreate(packTraderFrame, "Frame", "CoinRainLayer")
+coinRainLayer.BackgroundTransparency = 1
+coinRainLayer.Size = UDim2.fromScale(1, 1)
+coinRainLayer.Position = UDim2.fromScale(0, 0)
+coinRainLayer.ClipsDescendants = true
+coinRainLayer.Active = false
+coinRainLayer.Selectable = false
+coinRainLayer.ZIndex = 2
+
 local offersPanel = packTraderFrame:FindFirstChild("OffersPanel")
 if offersPanel then
 	local soldOutText = getOrCreate(offersPanel, "TextLabel", "SoldOutText")

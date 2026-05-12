@@ -89,6 +89,16 @@ local UIAssetConfig = {
 			BackgroundImage = "rbxassetid://100119440680374",
 			IconImage = "rbxassetid://116226379106030",
 		},
+		Claimed = {
+			BackgroundImage = "rbxassetid://0",
+			IconImage = "rbxassetid://0",
+			FallingCoinImage = "rbxassetid://0",
+		},
+		SuccessClaim = {
+			BackgroundImage = "rbxassetid://0",
+			IconImage = "rbxassetid://0",
+			FallingCoinImage = "rbxassetid://0",
+		},
 	},
 
 	Leaderboard = {
