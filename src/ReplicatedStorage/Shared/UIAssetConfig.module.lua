@@ -20,6 +20,7 @@ local UIAssetConfig = {
 			TooltipBackground = "rbxassetid://0",
 			PurchaseEffectImage = "rbxassetid://0",
 		},
+
 		MultiCoins = {
 			CardBackground = "rbxassetid://0",
 			BackgroundImage = "rbxassetid://0",
@@ -36,6 +37,7 @@ local UIAssetConfig = {
 			TooltipBackground = "rbxassetid://0",
 			PurchaseEffectImage = "rbxassetid://0",
 		},
+
 		MaxSpawnCoins = {
 			CardBackground = "rbxassetid://0",
 			BackgroundImage = "rbxassetid://0",
@@ -64,25 +66,28 @@ local UIAssetConfig = {
 
 	CoinPickupPopup = {
 		IconImage = "rbxassetid://0",
-		BackgroundImage = "rbxassetid://0",
+		BackgroundImage = "rbxassetid://124326451344705",
 	},
 
 	Notifications = {
 		Success = {
-			BackgroundImage = "rbxassetid://0",
-			IconImage = "rbxassetid://0",
+			BackgroundImage = "rbxassetid://112898706895909",
+			IconImage = "rbxassetid://75938736018356",
 		},
+
 		Limit = {
-			BackgroundImage = "rbxassetid://0",
-			IconImage = "rbxassetid://0",
+			BackgroundImage = "rbxassetid://100119440680374",
+			IconImage = "rbxassetid://116226379106030",
 		},
+
 		NotEnough = {
-			BackgroundImage = "rbxassetid://0",
-			IconImage = "rbxassetid://0",
+			BackgroundImage = "rbxassetid://100119440680374",
+			IconImage = "rbxassetid://116226379106030",
 		},
+
 		Error = {
-			BackgroundImage = "rbxassetid://0",
-			IconImage = "rbxassetid://0",
+			BackgroundImage = "rbxassetid://100119440680374",
+			IconImage = "rbxassetid://116226379106030",
 		},
 		Claimed = {
 			BackgroundImage = "rbxassetid://0",
